@@ -1,0 +1,724 @@
+# SOC Framework + CSOC JIRA Configuration Integration
+
+## Overview
+
+This document bridges the **SOC Framework v1.0** (7 analytics, 10 use cases, 8 automation rules) with your **detailed CSOC JIRA Configuration Guide** (100+ use cases, custom fields, workflows, Confluence integration).
+
+---
+
+## How They Work Together
+
+### The Framework Provides:
+- **Foundation**: 7 core analytics + 10 core use cases
+- **Architecture**: Data flow, integration patterns, JIRA automation
+- **Quick Start**: 30-day deployment roadmap
+- **Playbooks**: Detailed UC-001 example + response procedures
+
+### CSOC Guide Provides:
+- **Depth**: 100+ use cases across all attack categories
+- **Configuration Details**: Exact JIRA field definitions and workflows
+- **Data Sources**: Comprehensive Windows Event and Sysmon mapping
+- **Confluence Structure**: Shadow documentation and knowledge management
+- **Best Practices**: Handling legacy systems, undocumented assets, policy violations
+
+---
+
+## Deployment Strategy
+
+### Phase 1: Use Framework (Weeks 1-2)
+**Deploy the 7 foundation analytics + 10 core use cases**
+
+```
+Start with:
+├─ ANALYTIC-001 through ANALYTIC-007 (from Framework)
+├─ UC-001 through UC-010 (from Framework)
+├─ JIRA automation rules (8 rules from Framework)
+└─ Basic custom fields (from Framework)
+```
+
+**Why this approach:**
+- Get operational quickly
+- Build analyst confidence
+- Establish baselines
+- Prove value to leadership
+
+---
+
+### Phase 2: Implement CSOC Configuration (Weeks 3-8)
+**Expand with detailed CSOC fields, workflows, and 100+ use cases**
+
+#### Step 1: Add CSOC Custom Fields (Week 3)
+
+**From CSOC Guide - Core Alert/Incident Fields:**
+```
+Add to JIRA:
+├─ Alert Rule Name (already have)
+├─ Alert Source (Select: Search Head, SIEM, SOAR, Manual)
+├─ Detection Query (Text Long - store full SPL)
+├─ Search Head Link (URL - back to Splunk)
+├─ First Seen / Last Seen (DateTime)
+├─ Event Count (Number)
+├─ Confidence Score (Low/Medium/High)
+└─ Alert Disposition (9 values from CSOC guide)
+```
+
+**Add CSOC MITRE ATT&CK Fields:**
+```
+├─ ATT&CK Tactic (Multi-Select)
+├─ ATT&CK Technique (Cascading)
+├─ ATT&CK Sub-Technique (Text)
+└─ Data Sources (Multi-Select)
+```
+
+**Add CSOC RE&CT Fields:**
+```
+├─ RE&CT Stage (Select)
+└─ RE&CT Actions Completed (Multi-Select)
+```
+
+**Add CSOC Affected Assets Fields:**
+```
+├─ Affected Hosts (Text Long)
+├─ Affected Users (Text Long)
+├─ IOCs (Text Long - IPs, domains, hashes)
+├─ Asset Criticality (Select)
+├─ Asset Documentation Status (Documented/Undocumented/Legacy)
+└─ Business Owner (Text)
+```
+
+**Add CSOC Change Management Fields:**
+```
+├─ Change Ticket Number (Text)
+├─ Change Ticket Status (Select)
+└─ Change Window Validation (Select)
+```
+
+**Add CSOC Investigation Fields:**
+```
+├─ Known Pattern? (Yes/No/Unknown)
+├─ Previous Occurrences (Number)
+├─ Shift (Day/Night/Rotating)
+├─ Escalation Level (L1/L2/L3/Management)
+└─ Sample Event (Text Long)
+```
+
+**Total Custom Fields Added:** ~28 fields
+**Estimated JIRA Configuration Time:** 4-6 hours
+
+#### Step 2: Update JIRA Workflows (Week 3)
+
+**Replace simple Framework workflow with CSOC workflows:**
+
+**Replace:**
+```
+Simple: Triage → Investigation → Containment → Eradication → Recovery → Closed
+```
+
+**With CSOC Structure:**
+```
+Security Alert Workflow:
+New Alert → Triage → Change Validation (or Investigating) → Resolved → Closed
+
+Security Incident Workflow (promoted):
+Identification → Containment → Eradication → Recovery → Lessons Learned → Closed
+
+Policy Violation Workflow:
+Policy Violation → Pending Review → Escalated → Resolved → Closed
+```
+
+**Estimated Time:** 4-6 hours
+
+#### Step 3: Build Confluence Use Case Library (Weeks 4-8)
+
+**Start with Framework Use Cases UC-001 through UC-010**
+**Expand with CSOC categorized use cases:**
+
+```
+UC-001 to UC-010:   Self-Administration & Insider Threat
+UC-011 to UC-017:   Privileged Access Abuse
+UC-018 to UC-025:   Credential Access
+UC-026 to UC-034:   Persistence
+UC-035 to UC-045:   Execution
+UC-046 to UC-053:   Lateral Movement
+UC-054 to UC-059:   Collection & Exfiltration
+UC-060 to UC-066:   Defense Evasion
+UC-067 to UC-072:   Discovery
+UC-073 to UC-077:   Orphaned Accounts
+UC-078 to UC-082:   Undocumented Systems
+UC-083 to UC-088:   Legacy Exploitation
+UC-089 to UC-092:   Trust Abuse
+UC-093 to UC-096:   Policy Bypass
+UC-097 to UC-100:   Off-Hours Activity
+UC-101 to UC-104:   Asset Violations
+```
+
+**Use Case Page Template (from CSOC Guide):**
+- Overview + severity + MITRE ATT&CK
+- Detection analytics + data sources
+- Investigation steps
+- Known false positives
+- Tuning guidance
+- Related playbooks
+- Example alerts
+
+**Content Development:**
+- Week 4: UC-001 through UC-025 (25 use cases)
+- Week 5: UC-026 through UC-050 (25 use cases)
+- Week 6: UC-051 through UC-075 (25 use cases)
+- Week 7: UC-076 through UC-104 (29 use cases)
+- Week 8: Polish, cross-reference, validate completeness
+
+**Estimated Time:** 2-3 hours per use case × 100 = 200-300 hours over 4 weeks (can be distributed across team)
+
+#### Step 4: Implement Advanced Automation Rules (Week 5-6)
+
+**Framework provided 8 basic rules. Add CSOC enhancements:**
+
+```
+From Framework (keep as-is):
+1. Alert Ingestion & Enrichment
+2. Use Case & RE&CT Mapping
+3. Assignment & SLA Configuration
+4. RE&CT Phase Progression
+5. Evidence Collection Automation
+6. Escalation Logic
+7. Notification & Communication
+8. Verdict & Closure
+
+Add CSOC Advanced Rules:
+9. Auto-populate ATT&CK from Use Case
+10. Change Ticket Validation Reminder
+11. Auto-link Related Alerts
+12. Promote to Incident (Issue Type Conversion)
+13. Documentation Enforcement
+14. Baseline Learning (FP categorization)
+15. Asset Documentation Update
+16. Policy Violation Detection
+17. Undocumented System Alert
+```
+
+**Estimated Time:** 2-3 hours per rule × 8 new rules = 16-24 hours
+
+#### Step 5: Build SOC Asset Intelligence in Confluence (Week 6-8)
+
+**Shadow IT documentation - what you discover through investigations:**
+
+```
+Confluence Pages:
+├─ Servers (by hostname)
+│  ├─ [HOSTNAME]
+│  │  ├─ IP Address
+│  │  ├─ OS Version
+│  │  ├─ Business Owner
+│  │  ├─ Services Running
+│  │  ├─ Documentation Status
+│  │  └─ Related Alerts
+│  └─ ... (repeat for all discovered servers)
+│
+├─ Applications
+│  ├─ [APP-NAME]
+│  │  ├─ Function
+│  │  ├─ Supported Servers
+│  │  ├─ Account Requirements
+│  │  └─ Related Alerts
+│  └─ ... (repeat for all applications)
+│
+└─ Network Segments
+   ├─ [SEGMENT-NAME]
+   │  ├─ IP Range
+   │  ├─ Criticality
+   │  ├─ Known Hosts
+   │  └─ Access Rules
+   └─ ... (repeat for all segments)
+```
+
+**Build collaboratively:**
+- Each alert mentioning new system → Document in Confluence
+- Weekly review: Add 20-50 new systems to intelligence
+- Link JIRA alerts to Confluence system pages
+
+---
+
+## Mapping Framework to CSOC Details
+
+### Analytics Mapping
+
+**Framework provides 7 core analytics. CSOC guide provides 104 use cases.**
+
+```
+Framework Analytic → CSOC Use Cases
+
+ANALYTIC-001: Admin Group Addition → UC-001, UC-002, UC-003, UC-011 through UC-017
+ANALYTIC-002: Suspicious Process → UC-035 through UC-045, UC-060 through UC-066
+ANALYTIC-003: Failed Login Spike → UC-018 through UC-025 (brute force)
+ANALYTIC-004: LSASS Access → UC-018 through UC-025 (credential access)
+ANALYTIC-005: Lateral Movement → UC-046 through UC-053
+ANALYTIC-006: Data Exfiltration → UC-054 through UC-059
+ANALYTIC-007: Privilege Escalation → UC-026 through UC-034, UC-060 through UC-066
+```
+
+**Example: ANALYTIC-004 Expansion**
+
+Framework provides UC-004 (OS Credential Dumping - LSASS Access)
+
+CSOC guide expands with:
+- UC-018: LSASS Memory Access (from CSOC guide)
+- UC-019: Credential Dumping Tool Keywords (from CSOC guide)
+- Plus UC-020 through UC-025 for other credential access techniques
+
+---
+
+## Custom Field Implementation Timeline
+
+### Week 1-2 (Framework Phase)
+**Minimal fields needed:**
+- Use-Case
+- MITRE-ATT&CK
+- Severity
+- RE&CT-Phase
+- Playbook-Link
+- SLA-Response
+- SLA-Resolution
+
+### Week 3 (CSOC Integration)
+**Add comprehensive fields all at once:**
+```
+Total fields to add: ~28
+┌─ Alert/Incident Core (10 fields)
+├─ MITRE ATT&CK (4 fields)
+├─ RE&CT Framework (2 fields)
+├─ Affected Assets (6 fields)
+├─ Change Management (3 fields)
+└─ Investigation (3 fields)
+```
+
+**Implementation approach:**
+1. Create all fields in dev JIRA
+2. Test with 10-20 sample alerts
+3. Train analysts on new fields
+4. Deploy to production
+5. Update all existing alerts (backfill)
+
+**Backfill Strategy:**
+- Prioritize CRITICAL and HIGH severity alerts
+- Use bulk edit where possible
+- New alerts auto-populate from Splunk webhook
+
+---
+
+## Confluence Structure Alignment
+
+### Framework Approach
+```
+Simple structure:
+├─ 00-Quick-Start-Guide.md
+├─ 01-Analytics-Repository.md
+├─ 02-Use-Cases-Repository.md
+└─ 03-REACT-Framework.md
+```
+
+### CSOC Approach
+```
+Comprehensive structure:
+├─ Detection Use Cases (100+ organized by technique)
+├─ Incident Response Playbooks
+├─ Investigation Runbooks
+├─ SOC Asset Intelligence (shadow IT documentation)
+├─ Detection Analytics Repository (by data source)
+├─ Knowledge Base Articles
+└─ Post-Incident Reviews (lessons learned)
+```
+
+### Hybrid Recommendation
+```
+CSOC Confluence Space Structure:
+
+CSOC Knowledge Base
+├─ Getting Started (Framework docs)
+│  ├─ 00-Quick-Start-Guide
+│  ├─ 00-Integration-Guide
+│  └─ JIRA-Workflow-Guide
+│
+├─ Detection Use Cases (Framework + CSOC)
+│  ├─ Self-Administration (UC-001 to UC-010)
+│  ├─ Privileged Access Abuse (UC-011 to UC-017)
+│  ├─ Credential Access (UC-018 to UC-025)
+│  ├─ ... (continue for all 104 use cases)
+│  └─ Each UC page uses CSOC template
+│
+├─ Incident Response (from Framework RE&CT)
+│  ├─ RA1xxx: Identification
+│  ├─ RA3xxx: Containment
+│  ├─ RA4xxx: Eradication
+│  ├─ RA5xxx: Recovery
+│  └─ RA6xxx: Lessons Learned
+│
+├─ Playbooks & Runbooks (Framework examples)
+│  ├─ Phishing Response
+│  ├─ Ransomware Response
+│  ├─ Credential Compromise Response
+│  └─ ... (IR playbooks using Framework)
+│
+├─ Investigation Resources (CSOC guide)
+│  ├─ Windows Event Log Analysis
+│  ├─ PowerShell Investigation
+│  ├─ Service Account Validation
+│  └─ Change Ticket Validation
+│
+├─ SOC Asset Intelligence (CSOC guide)
+│  ├─ Servers (by hostname)
+│  ├─ Applications
+│  ├─ Network Segments
+│  └─ (Built over time through investigations)
+│
+├─ Detection Analytics Library (CSOC guide)
+│  ├─ Windows Security Events (4688, 4624, etc.)
+│  ├─ Sysmon Events (1, 10, 19/20/21)
+│  ├─ Windows System Logs
+│  ├─ DNS Logs
+│  └─ DHCP Logs
+│
+├─ Knowledge Base (CSOC guide)
+│  ├─ False Positive Handling
+│  ├─ Tool Usage Guides
+│  └─ Threat Actor Profiles
+│
+└─ Post-Incident Reviews
+   └─ [Date] - [Incident] - Lessons Learned
+```
+
+---
+
+## Handling Transition from Framework to CSOC
+
+### Week 1-2: Run Framework Only
+```
+- Deploy Framework 7 analytics
+- Use Framework 10 use cases
+- Use Framework 8 automation rules
+- Basic JIRA fields only
+- Team gets comfortable with core workflow
+```
+
+**Success metrics:**
+- ✓ Alerts firing consistently
+- ✓ JIRA tickets auto-creating
+- ✓ Analysts following playbooks
+- ✓ Team confident with process
+
+### Week 3: Add CSOC Fields (Transition Week)
+```
+- Monday: Add all CSOC custom fields to JIRA
+- Tuesday: Configure new fields in automation rules
+- Wednesday: Test with sample data
+- Thursday: Update automation rules with new field logic
+- Friday: Train team on new fields
+```
+
+**Minimal disruption:**
+- Existing alerts keep working
+- New alerts auto-populate more fields
+- Team gradually learns new field purposes
+
+### Weeks 4-8: Build Out CSOC Use Cases
+```
+- Continue deploying Framework analytics
+- Start building 100+ use cases in Confluence
+- Update automation rules with new logic
+- Build SOC Asset Intelligence as discoveries happen
+- Team becomes more effective with comprehensive knowledge
+```
+
+---
+
+## Analyst Workflow with Combined Approach
+
+### Simple View (Days 1-7)
+Analyst sees:
+```
+Alert fires → JIRA ticket → Review UC-001 to UC-010 → Investigate → Close
+```
+
+### Enhanced View (Weeks 3+)
+Analyst sees:
+```
+Alert fires → JIRA ticket (rich fields) 
+├─ Check Alert Disposition field (9 categorization options)
+├─ Review ATT&CK Tactic/Technique (auto-populated)
+├─ Check Change Ticket Status (auto-validated)
+├─ Review Asset Documentation Status (undocumented flag)
+├─ Link to Confluence UC page (100+ deep use cases)
+├─ Link to Related Alerts (auto-linked by system)
+└─ Investigate with full context
+```
+
+---
+
+## CSOC-Specific Enhancements to Framework
+
+### 1. Policy Violation Handling
+Framework provides incident response. CSOC adds:
+```
+New workflow: Policy Violation (not security incident)
+├─ No Change Ticket
+├─ Change Outside Window  
+├─ Expired Change Ticket
+└─ Policy Bypass
+
+Separate from malicious incidents → Different escalation
+```
+
+### 2. Asset Documentation
+Framework assumes documented assets. CSOC adds:
+```
+New custom field: Asset Documentation Status
+├─ Documented (expected)
+├─ Undocumented (discovered through investigation)
+└─ Legacy (known older systems)
+
+Generates Asset Investigation Requests for undocumented systems
+```
+
+### 3. Shift Awareness
+Framework mentions 12-hour shifts. CSOC adds:
+```
+New custom field: Shift
+├─ Day (06:00-18:00)
+├─ Night (18:00-06:00)
+└─ Rotating
+
+Auto-assignment based on current shift
+Handoff procedure between shifts
+```
+
+### 4. Shadow IT Discovery
+Framework provides detection. CSOC adds:
+```
+Confluence: SOC Asset Intelligence
+├─ Servers (discovered during investigations)
+├─ Applications (unknown apps found)
+└─ Network Segments (undocumented)
+
+Built collaboratively over time
+Reduces undocumented systems over time
+```
+
+---
+
+## Detection Analytics Expansion
+
+### Framework Provides (7 Analytics)
+```
+ANALYTIC-001: Local Admin Group Addition
+ANALYTIC-002: Suspicious Process Execution
+ANALYTIC-003: Failed Login Spike
+ANALYTIC-004: Credential Dumping
+ANALYTIC-005: Lateral Movement
+ANALYTIC-006: Data Exfiltration
+ANALYTIC-007: Privilege Escalation
+```
+
+### CSOC Guide Provides Templates for:
+```
+Windows Event Analytics:
+├─ 4624/4625: Logon events
+├─ 4688: Process Creation
+├─ 4697/4698: Service/Task Creation
+├─ 4728/4732/4756: Group Changes
+├─ 4738: User Changes
+└─ Many more...
+
+Sysmon Analytics:
+├─ Event 1: Process Creation
+├─ Event 10: Process Access
+├─ Events 19/20/21: WMI Activity
+└─ Others...
+
+Network/DNS/DHCP:
+├─ DNS query patterns
+├─ DHCP lease anomalies
+└─ Network flow analysis
+```
+
+### Expansion Strategy
+```
+Week 1-2: Framework 7 analytics (get operational)
+Week 3-4: Add Windows Event analytics (10-15 more)
+Week 5-6: Add Sysmon analytics (10-15 more)
+Week 7-8: Add Network/DNS/DHCP analytics (5-10 more)
+
+Total: ~40-50 analytics by end of Month 2
+```
+
+---
+
+## Key Differences & How to Handle Them
+
+### Framework Simplicity vs. CSOC Comprehensiveness
+
+| Aspect | Framework | CSOC | Resolution |
+|--------|-----------|------|-----------|
+| **Use Cases** | 10 core cases | 100+ comprehensive cases | Start with 10, expand weekly |
+| **Custom Fields** | 7-8 essential | 28+ comprehensive | Add Week 3 |
+| **Workflows** | Single alert flow | 3 specialized workflows | Update Week 3 |
+| **Documentation** | Core concepts | Deep technical details | Reference as needed |
+| **Asset Intelligence** | Not included | Central Confluence | Build as you go |
+| **Policy Violations** | Security incidents only | Separate workflow | Implement Week 3 |
+
+### Transition Approach
+```
+PHASE 1 (Weeks 1-2): Framework Only
+├─ Deploy, train, stabilize
+├─ Prove value quickly
+└─ Build analyst confidence
+
+TRANSITION (Week 3): Add CSOC
+├─ Add fields all at once
+├─ Migrate to detailed workflows
+├─ Enable more automation
+└─ Team adapts gradually
+
+PHASE 2 (Weeks 4-8): CSOC Full
+├─ Build 100+ use cases
+├─ Leverage all fields
+├─ Advanced automation
+└─ Comprehensive coverage
+```
+
+---
+
+## Questions This Integration Answers
+
+**Q: How do I deploy both?**
+A: Framework first (2 weeks), then CSOC expansion (6 weeks). No conflict.
+
+**Q: Do I need all 28 custom fields?**
+A: No. Framework requires 7-8. Add CSOC fields in Week 3 when you're ready.
+
+**Q: Can I use just the Framework?**
+A: Yes. It's production-ready as-is. CSOC guide adds depth and coverage.
+
+**Q: Should I deploy all 100+ use cases?**
+A: No. Start with Framework 10, add CSOC use cases as analytics mature.
+
+**Q: How do I handle the different workflows?**
+A: Framework provides single flow. Implement CSOC 3-flow system in Week 3.
+
+**Q: What about Confluence?**
+A: Framework docs can go in Confluence directly. Use CSOC structure for organization.
+
+---
+
+## Recommended Path for Your Environment
+
+Given your mention of:
+- 12-hour rotating shifts
+- 5-on/5-off schedule
+- Legacy systems
+- Undocumented infrastructure
+- JIRA + Confluence
+- Need for transformation
+
+**Recommended deployment:**
+
+```
+WEEK 1-2: Framework Foundation
+├─ Deploy 7 analytics (UC-001 through UC-007)
+├─ JIRA with Framework fields
+├─ Basic automation (8 rules)
+└─ Team gets operational
+
+WEEK 3: CSOC Integration
+├─ Add 28 CSOC custom fields
+├─ Update JIRA workflows (3 types)
+├─ Implement 8 additional automation rules
+└─ Train on new capabilities
+
+WEEKS 4-8: CSOC Expansion
+├─ Deploy remaining analytics
+├─ Build 100+ use cases in Confluence
+├─ Implement CSOC detection library
+├─ Develop SOC Asset Intelligence
+└─ Handle legacy/undocumented systems
+
+WEEKS 9+: Optimization
+├─ Tune detections based on baselines
+├─ Implement threat hunting program
+├─ Review lessons learned
+└─ Expand coverage based on gaps
+```
+
+This gives you:
+- ✓ Quick operational start (Week 1-2)
+- ✓ Smooth CSOC integration (Week 3)
+- ✓ Comprehensive coverage (Weeks 4-8)
+- ✓ Mature SOC (Weeks 9+)
+
+---
+
+## Files to Use Together
+
+**Together they provide:**
+
+| Document | Purpose | When to Use |
+|----------|---------|------------|
+| **Framework Docs** | Foundation + playbook | Weeks 1-2 |
+| **CSOC Guide** | Detailed reference | Weeks 3+ |
+| **This Integration Doc** | Bridge between them | Transition (Week 3) |
+
+**Reading order:**
+1. Framework README.md (understand foundation)
+2. CSOC Guide (understand target state)
+3. This document (understand integration)
+4. Implementation (follow roadmap above)
+
+---
+
+## Success Metrics
+
+### Week 2 Checkpoint
+- ✓ 7 analytics deployed
+- ✓ Alerts firing reliably
+- ✓ JIRA workflow working
+- ✓ Team confident
+
+### Week 3 Checkpoint
+- ✓ New fields added
+- ✓ Workflows updated
+- ✓ Team trained
+- ✓ No disruption to operations
+
+### Week 8 Checkpoint
+- ✓ 100+ use cases documented
+- ✓ Comprehensive coverage
+- ✓ Asset intelligence built
+- ✓ Advanced automations working
+
+### Month 3+ Checkpoint
+- ✓ MTTR under 4 hours
+- ✓ TP rate >70%
+- ✓ Threat hunting active
+- ✓ Continuous improvements
+
+---
+
+## Next Steps
+
+1. **Read Framework** - Understand the foundation
+2. **Review CSOC Guide** - Understand detailed configuration
+3. **Read This Document** - Understand how they integrate
+4. **Plan Deployment** - Customize timeline for your team
+5. **Begin Week 1** - Deploy Framework
+6. **Transition Week 3** - Integrate CSOC
+7. **Expand Weeks 4-8** - Build comprehensive SOC
+
+Your combined approach gives you the best of both:
+- **Quick time to value** (Framework)
+- **Comprehensive coverage** (CSOC)
+- **Smooth integration** (This guide)
+
+---
+
+**You now have everything needed for a world-class SOC. Begin with the Framework, expand with CSOC, and refer to this integration guide during the transition.**
+
+Good luck with your SOC transformation! 🚀
