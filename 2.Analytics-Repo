@@ -1,0 +1,248 @@
+# Analytics Repository - Core Detection Queries
+
+## Overview
+These 7 analytics form the foundation of the SOC detection program. Each maps to MITRE ATT&CK and triggers JIRA workflow automation.
+
+---
+
+## ANALYTIC-001: Local Admin Group Addition
+
+**Severity:** High  
+**ATT&CK:** T1098 (Account Manipulation), T1136 (Create Account)  
+**Use Case:** UC-001  
+**Detection Method:** Windows Event Log 4728
+
+```spl
+index=windows EventCode=4728 
+| stats count by SubjectUserName, TargetUserName, Computer, dest_nt_domain
+| search count >= 1
+| table SubjectUserName, TargetUserName, Computer, dest_nt_domain, _time
+| rename SubjectUserName as "Actor", TargetUserName as "Target", Computer as "Host"
+```
+
+**False Positives:**
+- Scheduled provisioning tasks (filter by SubjectUserName if known service account)
+- Help desk during onboarding (document approved accounts)
+
+**Tuning:**
+- Whitelist known service accounts in lookup table `approved_admin_provisioners.csv`
+- Exclude DC$ accounts (system-level operations)
+
+**Expected Alerting:** 1-3 per week in mature environment
+
+---
+
+## ANALYTIC-002: Suspicious Process Execution - LOLBAS
+
+**Severity:** Medium-High  
+**ATT&CK:** T1059 (Command and Scripting Interpreter), T1562 (Impair Defenses)  
+**Use Case:** UC-002  
+**Detection Method:** Sysmon Event 1 (Process Creation)
+
+```spl
+index=sysmon EventCode=1 
+  (Image IN (C:\Windows\System32\certutil.exe, C:\Windows\System32\powershell.exe)
+   OR CommandLine IN ("*-nop*", "*-enc*", "*bypass*", "*rundll32*"))
+  AND NOT User IN (DOMAIN\ServiceAccount, DOMAIN\AdminAccount)
+  AND NOT (Image="C:\Windows\System32\powershell.exe" AND ParentImage="C:\Windows\System32\svchost.exe")
+| stats count by Host, User, Image, CommandLine, ParentImage
+| where count >= 1
+| rename Host as "Computer", User as "Actor", Image as "Process", CommandLine as "Command"
+```
+
+**False Positives:**
+- Legitimate admin PowerShell sessions (add to exception list)
+- Antivirus/EDR using certutil (whitelist vendor processes)
+
+**Tuning:**
+- Adjust for environment-specific LOLBAS use
+- Exclude legitimate automation processes
+- Review CommandLine patterns weekly
+
+**Expected Alerting:** 2-5 per week
+
+---
+
+## ANALYTIC-003: Failed Login Spike (Brute Force Detection)
+
+**Severity:** Medium  
+**ATT&CK:** T1110 (Brute Force)  
+**Use Case:** UC-003  
+**Detection Method:** Windows Event Log 4625 (Failed Logon)
+
+```spl
+index=windows EventCode=4625
+| bucket _time span=5m
+| stats count as FailedAttempts by _time, TargetUserName, SourceIPAddress, dest_nt_domain
+| where FailedAttempts > 5
+| table _time, TargetUserName, SourceIPAddress, FailedAttempts, dest_nt_domain
+| rename TargetUserName as "Target Account", SourceIPAddress as "Source IP", FailedAttempts as "Failed Login Count"
+```
+
+**False Positives:**
+- Users entering wrong password (legitimate user confusion)
+- Cached credential failures (mobile users, VPN issues)
+- Service account password rotation (filter by account)
+
+**Tuning:**
+- Threshold: 5+ failures in 5 minutes for external IPs, 10+ for internal
+- Whitelist internal service accounts
+- Exclude known VPN/proxy IPs
+
+**Expected Alerting:** 3-7 per week
+
+---
+
+## ANALYTIC-004: Credential Dumping - Process Memory Access
+
+**Severity:** Critical  
+**ATT&CK:** T1003 (OS Credential Dumping)  
+**Use Case:** UC-004  
+**Detection Method:** Sysmon Event 10 (Process Access)
+
+```spl
+index=sysmon EventCode=10 
+  TargetImage IN ("*lsass.exe", "*winlogon.exe", "*csrss.exe")
+  AND SourceImage NOT IN ("C:\Windows\System32\svchost.exe", "C:\Program Files\*")
+  AND GrantedAccess IN ("0x1038", "0x1400", "0x1fffff")
+| stats count by SourceImage, SourceUser, TargetImage, Computer
+| where count >= 1
+| table SourceImage, SourceUser, TargetImage, Computer, _time
+| rename SourceImage as "Source Process", SourceUser as "User", Computer as "Host"
+```
+
+**False Positives:**
+- EDR/Antivirus scanning processes (whitelist vendor processes)
+- Windows Update/Patch processes (verify against maintenance windows)
+
+**Tuning:**
+- Whitelist legitimate security tools via `process_whitelist.csv`
+- High confidence alert - minimal tuning needed
+- Alert on every occurrence
+
+**Expected Alerting:** 0-2 per week (critical - investigate all)
+
+---
+
+## ANALYTIC-005: Lateral Movement - Suspicious DCom/WMI
+
+**Severity:** High  
+**ATT&CK:** T1021.003 (Distributed Component Object Model), T1047 (WMI)  
+**Use Case:** UC-005  
+**Detection Method:** Sysmon Event 3 (Network Connection)
+
+```spl
+index=sysmon EventCode=3
+  (DestinationPort IN (135, 445, 5985, 5986) AND DestinationIp != "127.0.0.1")
+  AND Image IN ("*powershell.exe", "*wmic.exe", "*cmd.exe")
+  AND User NOT IN (DOMAIN\ServiceAccount, SYSTEM)
+| stats count by Computer, SourceIp, DestinationIp, DestinationPort, User, Image
+| where count >= 1
+| table Computer, SourceIp, DestinationIp, DestinationPort, User, Image
+| rename Computer as "Source Host", DestinationIp as "Target Host", User as "Actor"
+```
+
+**False Positives:**
+- Legitimate admin remote sessions (whitelist by admin accounts)
+- Scheduled tasks using WMI (document and exclude)
+
+**Tuning:**
+- Exclude domain controllers communicating with each other
+- Whitelist legitimate RDP/admin tools
+- Review connection context (working hours, frequency)
+
+**Expected Alerting:** 2-4 per week
+
+---
+
+## ANALYTIC-006: Data Exfiltration - Large Outbound Transfer
+
+**Severity:** High  
+**ATT&CK:** T1041 (Exfiltration Over C2 Channel)  
+**Use Case:** UC-006  
+**Detection Method:** Syslog (Network Flow)
+
+```spl
+index=network sourcetype=syslog_traffic direction=outbound
+  dest_ip NOT IN (lookup_table_trusted_external_ips)
+  bytes_out > 104857600
+| bucket _time span=15m
+| stats sum(bytes_out) as TotalBytes by src_ip, dest_ip, dest_port, user
+| where TotalBytes > 104857600
+| table _time, src_ip, dest_ip, dest_port, user, TotalBytes
+| eval TotalBytes_GB=round(TotalBytes/1024/1024/1024, 2)
+| rename src_ip as "Source IP", dest_ip as "Destination IP", user as "User", TotalBytes_GB as "Volume (GB)"
+```
+
+**False Positives:**
+- Legitimate cloud backups (whitelist IP/domain pairs)
+- Large file transfers to approved vendors (update lookup table)
+- Streaming service/CDN traffic (filter by destination)
+
+**Tuning:**
+- Threshold: 100MB+ in 15 minutes (adjust for environment)
+- Create lookup table `trusted_external_ips.csv`
+- Review monthly for new legitimate destinations
+
+**Expected Alerting:** 1-3 per week
+
+---
+
+## ANALYTIC-007: Privilege Escalation - Token Impersonation/Elevation
+
+**Severity:** High  
+**ATT&CK:** T1134 (Access Token Manipulation)  
+**Use Case:** UC-007  
+**Detection Method:** Sysmon Event 8 (CreateRemoteThread)
+
+```spl
+index=sysmon EventCode=8 
+  SourceImage IN ("*powershell.exe", "*cmd.exe", "*rundll32.exe")
+  AND TargetImage IN ("*explorer.exe", "*svchost.exe", "*lsass.exe")
+| stats count by SourceImage, SourceUser, TargetImage, TargetUser, Computer
+| where count >= 1
+| table SourceImage, SourceUser, TargetImage, TargetUser, Computer, _time
+| rename SourceImage as "Source Process", TargetImage as "Target Process", Computer as "Host"
+```
+
+**False Positives:**
+- Legitimate admin tools (rare - review each)
+- Windows Update processes (exclude system accounts)
+
+**Tuning:**
+- Exclude SYSTEM, NETWORK SERVICE, LOCAL SERVICE
+- Low volume expected - review context for each alert
+- High confidence indicator
+
+**Expected Alerting:** 1-2 per week
+
+---
+
+## Analytic Deployment Checklist
+
+- [ ] Validate Splunk data ingestion for each log source
+- [ ] Test each query in dev environment
+- [ ] Configure alert thresholds for your environment
+- [ ] Create lookup tables (whitelists, approved accounts)
+- [ ] Set up JIRA webhook for alert ingestion
+- [ ] Configure email/Slack notifications
+- [ ] Document false positives in first 2 weeks
+- [ ] Adjust thresholds based on baseline activity
+
+## Metrics Tracking
+
+For each analytic, track:
+- **Weekly alert count** - baseline expectations set above
+- **True positive rate** - target 70%+ after 2-week tuning
+- **Investigation time** - average time from alert to triage decision
+- **False positive drivers** - common patterns to exclude
+
+---
+
+## Next Steps
+
+1. Deploy Analytics 1-3 in Week 1
+2. Add Analytics 4-5 in Week 2
+3. Add Analytics 6-7 in Week 3
+4. Tune based on false positives
+5. Expand with additional detections as team matures

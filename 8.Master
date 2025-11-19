@@ -1,0 +1,563 @@
+# SOC Framework v1.0 - Master Index
+
+## Framework Overview
+
+A complete, production-ready Security Operations Center framework built for your toolset:
+- **Detection:** 7 core analytics in Splunk
+- **Classification:** 10 use cases mapped to MITRE ATT&CK
+- **Response:** RE&CT framework with detailed procedures
+- **Orchestration:** JIRA with 8 automation rules
+- **Guidance:** Playbooks and runbooks for each incident type
+
+**Designed for:** 12-hour rotating shifts, 24/7 coverage, minimal alert tuning burden
+
+---
+
+## Document Structure
+
+### Foundation Documents
+
+| Doc | Purpose | Read First? |
+|-----|---------|------------|
+| **00-Quick-Start-Guide.md** | 30-minute deployment steps | ✓ START HERE |
+| **00-Integration-Guide.md** | How all components work together | ✓ THEN THIS |
+| **README.md** | This file | For reference |
+
+### Core Framework Components
+
+| Doc | Purpose | Deploy Order |
+|-----|---------|--------------|
+| **01-Analytics-Repository.md** | 7 detection queries with tuning | Week 1 |
+| **02-Use-Cases-Repository.md** | 10 incident classifications | Week 1 |
+| **03-REACT-Framework.md** | Response procedures (RA1-RA6) | Week 1-2 |
+| **06-JIRA-Automation.md** | JIRA config + 8 automation rules | Week 1 |
+| **12-Playbooks-UC-001.md** | Detailed UC-001 walkthrough | Week 2 |
+
+### Reference Materials
+
+| Doc | Purpose | Use As |
+|-----|---------|--------|
+| **Training Materials** | Team exercises and onboarding | For team training |
+| **Metrics Dashboard** | KPI tracking templates | For SOC reporting |
+| **Lookup Tables** | Whitelists and reference data | For fine-tuning |
+
+---
+
+## Quick Navigation
+
+### By Role
+
+**SOC Lead:**
+1. Read: 00-Quick-Start-Guide.md
+2. Review: 06-JIRA-Automation.md (Automation Rules section)
+3. Reference: 03-REACT-Framework.md (for escalation decisions)
+
+**Analyst (On-Call):**
+1. Read: 00-Quick-Start-Guide.md
+2. Study: 12-Playbooks-UC-001.md (template for all playbooks)
+3. Reference: 02-Use-Cases-Repository.md (during investigations)
+
+**Detection Engineer:**
+1. Read: 00-Integration-Guide.md (data flow)
+2. Study: 01-Analytics-Repository.md (all 7 analytics)
+3. Reference: 02-Use-Cases-Repository.md (use case details)
+
+**JIRA Administrator:**
+1. Read: 06-JIRA-Automation.md (entire document)
+2. Configure: Custom fields section
+3. Deploy: Automation rules section
+
+**Splunk Administrator:**
+1. Read: 01-Analytics-Repository.md
+2. Deploy: All 7 SPL queries
+3. Configure: Webhook to JIRA
+
+### By Task
+
+**"I need to deploy this framework"**
+→ Read 00-Quick-Start-Guide.md (30 min)
+
+**"I need to understand how everything connects"**
+→ Read 00-Integration-Guide.md
+
+**"I got an alert, what do I do?"**
+→ Go to 02-Use-Cases-Repository.md, find your use case, reference the playbook
+
+**"How do I tune this detection?"**
+→ Go to 01-Analytics-Repository.md, find your analytic, see "Tuning" section
+
+**"What should JIRA automation do?"**
+→ Go to 06-JIRA-Automation.md, see specific automation rules
+
+**"What are the response procedures?"**
+→ Go to 03-REACT-Framework.md, find the RA action you need
+
+---
+
+## Framework Components at a Glance
+
+### Detection Analytics (7 Total)
+
+```
+ANALYTIC-001: Local Admin Group Addition
+  → Windows Event Log 4728
+  → UC-001
+  → Severity: High
+
+ANALYTIC-002: Suspicious Process Execution
+  → Sysmon Event 1
+  → UC-002
+  → Severity: Medium-High
+
+ANALYTIC-003: Failed Login Spike
+  → Windows Event Log 4625
+  → UC-003
+  → Severity: Medium
+
+ANALYTIC-004: Credential Dumping
+  → Sysmon Event 10
+  → UC-004
+  → Severity: Critical
+
+ANALYTIC-005: Lateral Movement
+  → Sysmon Event 3
+  → UC-005
+  → Severity: High
+
+ANALYTIC-006: Data Exfiltration
+  → Network Flow (Syslog)
+  → UC-006
+  → Severity: High
+
+ANALYTIC-007: Privilege Escalation
+  → Sysmon Event 8
+  → UC-007
+  → Severity: High
+```
+
+### Use Cases (10 Total)
+
+```
+UC-001: Local Administrator Group Modification
+  • Playbook: 12-Playbooks-UC-001.md
+  • ATT&CK: T1098.002
+
+UC-002: Suspicious Process Execution - LOLBAS
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1059.001
+
+UC-003: Brute Force - Failed Login Spike
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1110.001
+
+UC-004: OS Credential Dumping - LSASS Access
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1003.001
+
+UC-005: Lateral Movement - RPC/WMI Abuse
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1021.003
+
+UC-006: Data Exfiltration - Large Outbound Transfer
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1041
+
+UC-007: Privilege Escalation - Token Impersonation
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1134
+
+UC-008: Insider Threat - Unusual Data Access
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1020
+
+UC-009: Malware Persistence - Scheduled Task
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1053.005
+
+UC-010: Defense Evasion - Firewall/AV Disable
+  • Playbook: [See pattern in UC-001]
+  • ATT&CK: T1562.004
+```
+
+### RE&CT Phases
+
+```
+RA1xxx: IDENTIFICATION
+  RA1001: Collect Initial Evidence
+  RA1002: Identify Affected Assets
+  RA1003: Determine Incident Type
+
+RA3xxx: CONTAINMENT
+  RA3101: Disable/Reset Compromised Credentials
+  RA3201: Terminate Suspicious Process
+  RA3301: Block Malicious IP/Domain
+
+RA4xxx: ERADICATION
+  RA4101: Reset Credentials (Full Scope)
+  RA4201: Remove Malware/Persistence
+  RA4401: Patch/Fix Exploitation Vector
+
+RA5xxx: RECOVERY
+  RA5001: Restore System from Backup
+  RA5101: Restore User Access
+
+RA6xxx: LESSONS LEARNED
+  RA6001: Incident Documentation
+  RA6002: Detection Improvement
+  RA6003: Control & Process Improvement
+```
+
+### JIRA Automation (8 Rules)
+
+```
+Rule 1: Alert Ingestion & Enrichment
+  • Trigger: Webhook from Splunk
+  • Action: Create JIRA ticket with basic data
+
+Rule 2: Use Case & RE&CT Mapping
+  • Trigger: Issue created
+  • Action: Populate use case, ATT&CK, playbook link
+
+Rule 3: Assignment & SLA Configuration
+  • Trigger: Issue moved to Investigation
+  • Action: Assign analyst, set SLA timers
+
+Rule 4: RE&CT Phase Progression
+  • Trigger: Issue status changes
+  • Action: Update RE&CT phase, create checklists
+
+Rule 5: Evidence Collection Automation
+  • Trigger: Issue escalated or high severity
+  • Action: Create evidence sub-tasks with checklists
+
+Rule 6: Escalation Logic
+  • Trigger: Alert severity threshold or manual flag
+  • Action: Convert to incident, create war room
+
+Rule 7: Notification & Communication
+  • Trigger: Status change or comment
+  • Action: Send Slack/email notifications
+
+Rule 8: Verdict & Closure
+  • Trigger: Issue moved to closed
+  • Action: Calculate metrics, create lessons learned
+```
+
+---
+
+## Deployment Roadmap
+
+### Phase 1: Foundation (Week 1)
+
+**Days 1-2: JIRA Setup**
+- [ ] Create SOC-OPS project
+- [ ] Configure custom fields (8 fields)
+- [ ] Set up workflow and board
+- [ ] Deploy automation rules (8 rules)
+
+**Days 3-4: Splunk Setup**
+- [ ] Deploy ANALYTIC-001 to Splunk
+- [ ] Configure alert action (webhook to JIRA)
+- [ ] Test end-to-end with UC-001
+
+**Day 5: Team Training**
+- [ ] Walk through 00-Quick-Start-Guide.md
+- [ ] Practice exercise with UC-001
+- [ ] Q&A and troubleshooting
+
+**Success Criteria:**
+- [ ] Alert fires in Splunk
+- [ ] JIRA ticket auto-creates
+- [ ] Custom fields populated
+- [ ] Team can run investigation
+
+### Phase 2: Expansion (Weeks 2-3)
+
+**Deploy remaining analytics:**
+- [ ] ANALYTIC-002 through ANALYTIC-007
+- [ ] Establish false positive baselines
+- [ ] Document tuning per analytic
+- [ ] Refine SLA thresholds
+
+**Develop additional playbooks:**
+- [ ] Create playbook template (based on UC-001)
+- [ ] Develop playbooks for UC-002 through UC-010
+- [ ] Team reviews and validates
+
+**Operational metrics:**
+- [ ] MTTT (Mean Time to Triage) tracking
+- [ ] MTTR (Mean Time to Resolve) tracking
+- [ ] Alert quality scoring
+- [ ] Analyst feedback
+
+### Phase 3: Optimization (Weeks 4+)
+
+**Continuous improvement:**
+- [ ] Monthly detection reviews
+- [ ] False positive tuning
+- [ ] Playbook refinement
+- [ ] New detection development
+
+**Advanced capabilities:**
+- [ ] Threat hunt program (5-10 hunts/month)
+- [ ] Detection gap analysis
+- [ ] Compliance mapping
+- [ ] Executive reporting
+
+---
+
+## Critical Configuration Checklist
+
+### JIRA Configuration
+- [ ] Project created: SOC-OPS
+- [ ] Custom fields configured (8 total)
+- [ ] Workflow configured with 6 statuses
+- [ ] Board configured (Kanban)
+- [ ] Automation rules deployed (8 rules)
+- [ ] SLA rules configured
+- [ ] Webhooks configured (incoming from Splunk)
+- [ ] Team permissions assigned
+- [ ] Issue linking enabled
+- [ ] Attachment file size increased (for evidence)
+
+### Splunk Configuration
+- [ ] Data sources ingesting:
+  - [ ] Windows Event Logs
+  - [ ] Sysmon
+  - [ ] Syslog/Network flow
+- [ ] 7 analytics deployed as saved searches
+- [ ] Alert actions configured:
+  - [ ] Webhook to JIRA
+  - [ ] Email notifications
+  - [ ] Slack integration (optional)
+- [ ] Index privileges restricted
+- [ ] Search head redundancy (if applicable)
+- [ ] License monitoring
+
+### Active Directory Integration
+- [ ] Service account created (for AD lookups)
+- [ ] Permissions: Read group membership, user properties
+- [ ] PowerShell remoting enabled (if using automation)
+- [ ] Secure credential storage configured
+
+### Integrations
+- [ ] Slack workspace created (optional but recommended)
+- [ ] JIRA to Slack webhook configured
+- [ ] Splunk to JIRA webhook tested
+- [ ] Threat intelligence feed configured (optional)
+- [ ] Change management system accessible
+
+---
+
+## Key Metrics to Track
+
+### Operational Metrics (Weekly)
+
+```
+Triage: Mean Time to Triage (MTTT)
+  • Target: 15 minutes
+  • Measure: Time from alert to investigation start
+
+Detection: Mean Time to Detect (MTTD)
+  • Target: 5 minutes from event occurrence
+  • Measure: Event timestamp to alert fire
+
+Containment: Mean Time to Contain (MTTC)
+  • Target: 30 minutes (if containment needed)
+  • Measure: Investigation start to containment action
+
+Resolution: Mean Time to Resolve (MTTR)
+  • Target: 2 hours (varies by severity)
+  • Measure: Alert to closure
+
+SLA Compliance: % alerts meeting SLA
+  • Target: 95%
+  • Measure: MTTT, MTTC, MTTR vs. SLA thresholds
+```
+
+### Quality Metrics (Weekly)
+
+```
+True Positive Rate
+  • Target: 70%+
+  • Measure: (True positives / Total alerts) × 100
+
+False Positive Rate
+  • Target: <30%
+  • Measure: (False positives / Total alerts) × 100
+
+Alert Quality Score
+  • Target: 70+
+  • Measure: Composite of TP rate and analyst satisfaction
+
+Analyst Satisfaction
+  • Target: 4+ out of 5
+  • Measure: Post-incident surveys
+```
+
+### Coverage Metrics (Monthly)
+
+```
+MITRE ATT&CK Coverage
+  • Target: 30%+ of techniques in environment
+  • Measure: Detections per ATT&CK technique
+
+Detection Improvement Rate
+  • Target: 1+ new detection per month
+  • Measure: New analytics from threat hunting or lessons learned
+
+Hunt Program Effectiveness
+  • Target: 1-2 findings converted to detection per month
+  • Measure: Hunting hours → findings → detection
+```
+
+---
+
+## Support & Troubleshooting
+
+### Quick Troubleshooting
+
+**Alert not firing:**
+1. Check Splunk query manually
+2. Verify alert conditions met
+3. Check alert execution log
+4. Validate data ingestion
+
+**JIRA not receiving alerts:**
+1. Test webhook manually: `curl {webhook-url} -X POST -H "Content-Type: application/json"`
+2. Check JIRA authentication
+3. Review alert action configuration
+4. Check network connectivity
+
+**Custom field not populating:**
+1. Verify JIRA automation rules enabled
+2. Check rule conditions match issue
+3. Review automation execution logs
+4. Confirm field has correct name
+
+**SLA not calculating:**
+1. Verify SLA time tracking enabled
+2. Check business hours configured
+3. Confirm issue in SLA-tracked statuses
+4. Verify custom field populated
+
+### Getting Help
+
+**For JIRA Issues:**
+- JIRA Administration guide: Atlassian docs
+- Automation rules: JIRA automation documentation
+- Contact: JIRA Administrator
+
+**For Splunk Issues:**
+- SPL query syntax: Splunk docs
+- Alert actions: Splunk webhook documentation
+- Contact: Splunk Administrator
+
+**For Detection Issues:**
+- Analytics tuning: See 01-Analytics-Repository.md
+- False positives: See tuning guidance per analytic
+- Contact: SOC Detection Engineer
+
+**For Response Issues:**
+- Playbook questions: See 12-Playbooks-UC-001.md (template)
+- RE&CT procedures: See 03-REACT-Framework.md
+- Contact: SOC Lead
+
+---
+
+## Training & Onboarding
+
+### New Analyst Onboarding (1 Week)
+
+**Day 1:**
+- Read: 00-Quick-Start-Guide.md
+- Read: 00-Integration-Guide.md
+- Shadow: Senior analyst for 4 hours
+
+**Day 2:**
+- Study: 02-Use-Cases-Repository.md (UC-001 to UC-003)
+- Read: 12-Playbooks-UC-001.md
+- Practice: Run through UC-001 exercise in test environment
+
+**Day 3:**
+- Study: 02-Use-Cases-Repository.md (UC-004 to UC-007)
+- Practice: Simulate UC-004 incident
+- Q&A with SOC Lead
+
+**Day 4:**
+- Study: 03-REACT-Framework.md (RA1xxx and RA3xxx)
+- Practice: Containment procedures
+- Hands-on with JIRA
+
+**Day 5:**
+- Review all materials
+- Handle 3 real alerts under supervision
+- Pass assessment
+
+### Continuing Education
+
+- **Weekly:** 15-min use case deep-dive (one UC per week)
+- **Monthly:** Lessons learned review (30 min)
+- **Quarterly:** New threat landscape briefing (60 min)
+- **As-needed:** Tool training and certification prep
+
+---
+
+## Document Maintenance
+
+### Update Frequency
+
+| Component | Frequency | Owner |
+|-----------|-----------|-------|
+| Analytics | Monthly (tuning) | Detection Engineer |
+| Use Cases | Quarterly (lessons learned) | SOC Lead |
+| RE&CT | Quarterly (improvements) | SOC Lead |
+| Playbooks | Quarterly (based on incidents) | SOC Lead |
+| JIRA Config | As needed (process changes) | JIRA Admin |
+
+### Version Control
+
+Current Version: **v1.0 (January 2025)**
+
+Future versions will include:
+- v1.1: Additional use cases (UC-011+)
+- v1.2: Threat hunting program details
+- v2.0: SOAR integration and advanced automation
+
+---
+
+## License & Usage
+
+**Internal Use Only** - Proprietary and Confidential
+
+This framework is designed for your organization's Security Operations Center. Do not distribute externally without approval.
+
+---
+
+## Framework Summary
+
+```
+7 ANALYTICS → 10 USE CASES → MITRE ATT&CK → RE&CT RESPONSE → JIRA ORCHESTRATION → PLAYBOOKS & RUNBOOKS
+
+Detection       Classification   Framework   Procedures      Automation          Guidance
+├─ ANALYTIC-001 ├─ UC-001        ├─ T1098    ├─ RA1xxx      ├─ Rule 1-8        ├─ 12-Playbooks
+├─ ANALYTIC-002 ├─ UC-002        ├─ T1059    ├─ RA3xxx      ├─ Custom Fields    ├─ Runbooks
+├─ ANALYTIC-003 ├─ UC-003        ├─ T1110    ├─ RA4xxx      ├─ Workflows        ├─ Checklists
+├─ ANALYTIC-004 ├─ UC-004        ├─ T1003    ├─ RA5xxx      ├─ Automations      ├─ Commands
+├─ ANALYTIC-005 ├─ UC-005        ├─ T1021    ├─ RA6xxx      └─ SLA Rules        └─ Templates
+├─ ANALYTIC-006 ├─ UC-006        └─ T1041
+└─ ANALYTIC-007 └─ UC-007+
+```
+
+---
+
+## Start Here
+
+1. **First 30 minutes:** Read 00-Quick-Start-Guide.md
+2. **Next hour:** Read 00-Integration-Guide.md
+3. **This week:** Follow deployment roadmap (Phase 1)
+4. **First month:** Deploy all components per roadmap
+
+Your SOC framework is now ready for deployment. Begin with the Quick Start Guide.
+
+**Questions?** Contact SOC Leadership

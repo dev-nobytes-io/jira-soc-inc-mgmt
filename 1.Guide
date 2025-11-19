@@ -1,0 +1,53 @@
+# SOC Framework Quick Start Guide
+
+## 30-Minute Setup
+
+### Prerequisites
+- JIRA Cloud or Data Center
+- Splunk Search Head with ingestion from Windows Event Logs, Sysmon, Syslog
+- Active Directory integration available
+- Slack workspace (optional but recommended)
+
+### Phase 1: JIRA Foundation (15 minutes)
+
+1. Create new JIRA project: **SOC-OPS**
+2. Import custom fields from `06-JIRA-Automation/Custom-Fields-Configuration.md`
+3. Create board: Kanban with columns: **Triage → Investigation → Containment → Eradication → Closed**
+
+### Phase 2: Deploy Analytics (10 minutes)
+
+1. Copy all SPL queries from `01-Analytics-Repository/`
+2. Create saved searches in Splunk
+3. Configure alerts to create JIRA issues via webhook
+
+### Phase 3: Configure Automations (5 minutes)
+
+1. Review `06-JIRA-Automation/Workflow-Automation-Rules.md`
+2. Deploy automation rules in JIRA
+3. Test end-to-end with `08-Training-Materials/Exercise-01.md`
+
+## Key Documents to Review First
+
+1. `02-Use-Cases-Repository/UC-001-AdminAddedToGroup.md` - Start here
+2. `06-JIRA-Automation/JIRA-Workflow-Overview.md` - Understand the flow
+3. `12-Playbooks/PB-001-CompromisedAccount.md` - See response in action
+
+## Testing Your Setup
+
+```
+Alert Generated → JIRA Issue Created → Automation Enriches → 
+Runbook Executes → Evidence Collected → RE&CT Actions Triggered
+```
+
+Run through `08-Training-Materials/Exercise-01-Alert-Triage.md` to validate.
+
+## Next Steps
+
+- Week 1: Familiarize team with framework
+- Week 2: Deploy first 3 analytics
+- Week 3: Enable full automation
+- Week 4: Begin threat hunting
+
+## Support
+
+Reference `10-Reference-Materials/` for templates and examples.

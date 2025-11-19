@@ -1,0 +1,719 @@
+# JIRA Workflow Automation & Integration Framework
+
+## Overview
+
+This document defines how JIRA serves as the central orchestration platform, connecting Splunk detections to RE&CT response actions, playbooks, and runbooks. Automation rules drive the incident lifecycle with minimal manual intervention.
+
+---
+
+## Architecture Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    SPLUNK DETECTION LAYER                        │
+│  ANALYTIC-001 → ANALYTIC-007 (7 production detections)          │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │ Alert Webhook
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  JIRA ORCHESTRATION LAYER                        │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ Custom Fields: MITRE-ATT&CK, Use-Case, RE&CT-Phase     │    │
+│  │                                                         │    │
+│  │ Automation Rules:                                       │    │
+│  │  1. Enrich alert with AD/threat intel                 │    │
+│  │  2. Link to Use Case runbook                          │    │
+│  │  3. Assign to on-call analyst                         │    │
+│  │  4. Trigger RE&CT playbook                            │    │
+│  │  5. Escalate if critical                              │    │
+│  │  6. Notify stakeholders                               │    │
+│  │  7. Collect evidence automatically                    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└────────────┬───────────────────────────────────────────┬────────┘
+             │                                           │
+             ▼                                           ▼
+    ┌─────────────────┐                    ┌──────────────────────┐
+    │ RE&CT PLAYBOOKS │                    │ RESPONSE AUTOMATION  │
+    ├─────────────────┤                    ├──────────────────────┤
+    │ RA1xxx Identify │                    │ Webhook to incident  │
+    │ RA3xxx Contain  │                    │ response tools       │
+    │ RA4xxx Eradicate│──────────────────→ │ AD commands          │
+    │ RA5xxx Recover  │                    │ Slack notifications  │
+    │ RA6xxx Lessons  │                    │ Ticket closure       │
+    └─────────────────┘                    └──────────────────────┘
+```
+
+---
+
+## JIRA Project Setup
+
+### Custom Fields
+
+Create these custom fields in SOC-OPS project:
+
+| Field Name | Type | Purpose | Automation |
+|------------|------|---------|-----------|
+| MITRE-ATT&CK | Text | T1234.001 technique | Auto-populated from analytic |
+| Use-Case | Dropdown | UC-001 to UC-010 | Auto-populated from analytic |
+| Severity-Override | Dropdown | Critical, High, Medium, Low | Manual override |
+| RE&CT-Phase | Dropdown | RA1xxx, RA3xxx, RA4xxx, RA5xxx, RA6xxx | Auto-set per phase |
+| Investigation-Status | Dropdown | Not Started, In Progress, Completed | Manual |
+| Verdict | Dropdown | True Positive, False Positive, Undetermined | Manual at close |
+| Analyst-Notes | Text Area | Investigation findings | Manual |
+| Evidence-Artifacts | Linked Issues | Links to evidence tickets | Auto-created |
+| Playbook-Link | Link | URL to UC playbook | Auto-populated |
+| SLA-Response | Date | Target response time | Auto-set based on severity |
+| SLA-Resolution | Date | Target resolution time | Auto-set based on severity |
+
+### Board Configuration
+
+**Status Workflow:**
+
+```
+Triage (Initial) → Investigation → Containment → Eradication → 
+Recovery → Closed
+
+With parallel Evidence Collection track
+```
+
+**Columns on Board:**
+1. **Triage** - Alert received, initial validation
+2. **Investigation** - Running runbook, gathering context
+3. **Containment** - RE&CT RA3xxx actions executing
+4. **Eradication** - RE&CT RA4xxx actions executing
+5. **Recovery** - RE&CT RA5xxx actions executing
+6. **Closed** - Case resolved, verdict determined
+
+---
+
+## Automation Rules
+
+### AUTOMATION RULE 1: Alert Ingestion & Enrichment
+
+**Trigger:** Webhook from Splunk (alert creation)
+
+**Conditions:**
+- Alert name matches pattern: `UC-[0-9]{3}`
+- Severity >= Medium
+
+**Actions:**
+```
+1. Create issue in SOC-OPS project
+2. Set title: "[{severity}] {alert_name} - {host}"
+3. Set description with:
+   - Analytic query
+   - Alert timestamp
+   - Affected hosts/users
+   - Source data
+4. Add labels: "soc-detection", "splunk-alert"
+5. Set issue type: "Task"
+6. Move to "Triage" column
+```
+
+**Webhook Payload Example:**
+```json
+{
+  "alert_name": "UC-001-AdminGroupAdd",
+  "severity": "High",
+  "analytic_id": "ANALYTIC-001",
+  "host": "SERVER-001",
+  "user": "user@domain.com",
+  "timestamp": "2025-01-15T14:32:00Z",
+  "query": "index=windows EventCode=4728 | stats by SubjectUserName, TargetUserName"
+}
+```
+
+---
+
+### AUTOMATION RULE 2: Use Case & RE&CT Mapping
+
+**Trigger:** Issue created in SOC-OPS
+
+**Conditions:**
+- Issue type = Task
+- Label = "splunk-alert"
+
+**Actions:**
+```
+1. Extract Use-Case from alert_name (UC-001, UC-002, etc.)
+2. Set custom field "Use-Case" = extracted value
+3. Query confluence for matching use case document
+4. Add "Playbook-Link" field with URL
+5. Set "MITRE-ATT&CK" custom field from use case mapping
+6. Set "RE&CT-Phase" = "RA1xxx" (Identification)
+7. Add comment with use case overview
+8. Attach investigation runbook to issue
+```
+
+**Mapping Logic:**
+```
+Alert Name Pattern → Use Case → MITRE Technique → RE&CT Action
+
+Example:
+UC-001 → UC-001-AdminGroupAdd → T1098.002 → RA1001, RA1002
+↓
+Create issue with:
+  - Use-Case: UC-001
+  - MITRE-ATT&CK: T1098.002
+  - Playbook: link to UC-001 document
+  - Initial RE&CT Phase: RA1001 (Identification)
+```
+
+---
+
+### AUTOMATION RULE 3: Assignment & SLA Configuration
+
+**Trigger:** Issue moved to "Investigation" column
+
+**Conditions:**
+- Issue in Investigation column
+- Severity = High or Critical
+
+**Actions:**
+```
+1. Query AD for on-call analyst
+2. Assign issue to analyst
+3. Set SLA-Response to 15 minutes (High) / 5 minutes (Critical)
+4. Set SLA-Resolution based on severity:
+   - Critical: 2 hours
+   - High: 8 hours
+   - Medium: 24 hours
+   - Low: 72 hours
+5. Send Slack notification:
+   "🚨 [HIGH] Investigation assigned to @analyst
+    UC-001: Admin Group Addition on SERVER-001
+    Runbook: [link]"
+```
+
+---
+
+### AUTOMATION RULE 4: RE&CT Phase Progression
+
+**Trigger:** Issue status changes
+
+**Conditions:**
+- Issue in "Containment" column
+- Verdict not yet set
+
+**Actions:**
+```
+1. Set RE&CT-Phase = "RA3xxx" (Containment)
+2. Add comment: "Entering Containment Phase"
+3. Generate checklist from UC playbook:
+   [ ] RA3101 - Revoke privileges
+   [ ] RA3201 - Terminate process
+   [ ] RA3301 - Block IP address
+   [ ] etc.
+4. Link to containment playbook
+5. Update SLA-Resolution (if escalated)
+6. Notify Security Manager via Slack
+```
+
+**When Moved to "Eradication":**
+```
+1. Set RE&CT-Phase = "RA4xxx"
+2. Generate eradication checklist:
+   [ ] RA4101 - Reset password
+   [ ] RA4201 - Remove persistence
+   [ ] RA4401 - Remove malware
+   [ ] etc.
+3. Create evidence collection ticket (sub-task)
+```
+
+**When Moved to "Recovery":**
+```
+1. Set RE&CT-Phase = "RA5xxx"
+2. Generate recovery checklist:
+   [ ] RA5001 - Reimage host
+   [ ] RA5101 - Restore access
+   [ ] RA5201 - Verify baseline
+   [ ] etc.
+```
+
+---
+
+### AUTOMATION RULE 5: Evidence Collection Automation
+
+**Trigger:** Issue created OR moved to "Eradication" column
+
+**Conditions:**
+- Severity >= High
+- Verdict = "True Positive" OR moved to Eradication
+
+**Actions:**
+```
+1. Create sub-task: "Evidence Collection"
+2. Generate evidence checklist based on Use Case:
+   
+   FOR UC-001 (Admin Group Add):
+   - [ ] Export group membership snapshot
+   - [ ] Retrieve event logs (4728) from DCs
+   - [ ] Document change timestamps
+   - [ ] Check for other privilege changes
+   - [ ] Capture screenshots of group properties
+   
+   FOR UC-004 (LSASS Access):
+   - [ ] Capture process dump
+   - [ ] Retrieve Sysmon logs
+   - [ ] Check for credential usage post-event
+   - [ ] Analyze memory access patterns
+   
+3. Webhook to SOAR/automation platform to:
+   - Remotely collect Windows Event Logs
+   - Export process listings
+   - Capture registry hives
+   - Generate memory forensics if critical
+4. Store evidence artifacts in secure location
+5. Link evidence ticket to main investigation
+```
+
+---
+
+### AUTOMATION RULE 6: Escalation Logic
+
+**Trigger:** Issue reaches severity thresholds OR manual escalation
+
+**Conditions:**
+```
+IF Severity = "Critical" OR
+   (Verdict = "True Positive" AND User = "Admin" AND Access = "Sensitive Data") OR
+   (Lateral Movement Detected AND Count > 5 hosts) OR
+   (Manual escalation flag set)
+THEN escalate
+```
+
+**Actions:**
+```
+1. Change issue type from "Task" to "Incident"
+2. Set Issue Priority = Highest
+3. Create war room ticket (sub-task)
+4. Generate incident brief (auto-populated template):
+   - Executive Summary
+   - Timeline of events
+   - Affected assets
+   - Current containment status
+   - Recommended next steps
+5. Notify stakeholders:
+   @SOCLead, @SecurityManager, @ITOps (if network isolation needed)
+6. Create Slack channel: #incident-{issue-key}
+7. Set meeting invite for incident response team
+8. Link to incident response playbook
+```
+
+**Escalation Template (Auto-Generated):**
+```
+INCIDENT BRIEF
+Issue: SOC-OPS-1234
+Severity: CRITICAL
+Type: Credential Dumping Attempt
+Use Case: UC-004
+
+TIMELINE:
+14:32:00 - Alert fired: LSASS accessed by suspicious.exe
+14:33:15 - Analyst assigned
+14:35:00 - Confirmed non-whitelisted process
+14:36:00 - Escalated to incident
+
+AFFECTED SYSTEMS:
+- HOST-DB-01 (database server, tier-1)
+
+CURRENT STATUS:
+- Process terminated ✓
+- Host isolated (pending) ⏳
+- Credentials reset (pending) ⏳
+
+NEXT STEPS:
+1. Isolate host from network
+2. Reset credentials for all domain admins
+3. Search for related LSASS access across estate
+4. Begin forensic investigation
+```
+
+---
+
+### AUTOMATION RULE 7: Notification & Communication
+
+**Trigger:** Issue status changes OR verdict set
+
+**Conditions:**
+- Issue in SOC-OPS project
+- Status changes to Investigation, Containment, Eradication, Recovery, Closed
+
+**Actions - Slack Notifications:**
+
+```
+ON MOVE TO INVESTIGATION:
+:mag: Investigation started on UC-001: Admin Group Addition
+Analyst: @john
+Runbook: [link]
+Target: SERVER-001 | User: user@domain.com
+
+ON MOVE TO CONTAINMENT:
+🛡️ Containment phase started
+Status: Revoking admin privileges
+Host: SERVER-001
+ETA: 10 minutes
+
+ON MOVE TO ERADICATION:
+:fire: Eradication phase started
+Actions in progress:
+  ✓ Privileges revoked
+  ✓ Process terminated
+  → Evidence collection started
+  → Password reset in progress
+
+ON MOVE TO RECOVERY:
+:green_check: Recovery phase started
+Actions:
+  → Host verification
+  → Service restart
+  → User access restoration
+
+ON CLOSED (TRUE POSITIVE):
+✅ Incident resolved
+Verdict: True Positive (Confirmed unauthorized access)
+Duration: 2 hours 15 minutes
+RE&CT: Identification → Containment → Eradication → Recovery
+```
+
+**Actions - Email Notifications:**
+
+```
+TO: Severity >= High AND Verdict = True Positive
+Subject: [SOC] Confirmed Security Incident: {use_case_name}
+
+Recipient List (auto-generated):
+- Security Manager
+- CISO (if critical)
+- Affected System Owner
+- IT Operations Lead
+- Compliance Officer (if data breach)
+```
+
+---
+
+### AUTOMATION RULE 8: Verdict & Closure
+
+**Trigger:** Issue moved to "Closed" column OR manual verdict set
+
+**Conditions:**
+- All RE&CT phases completed
+- Analyst set verdict (True Positive / False Positive / Undetermined)
+
+**Actions:**
+```
+1. Add "Verdict" tag to issue
+2. Generate closure summary:
+   - Root cause (if true positive)
+   - Impact assessment
+   - Recommendations
+   - Similar alerts to review
+
+3. IF Verdict = "True Positive":
+   - Create "Lessons Learned" sub-task (RA6xxx)
+   - Assign to SOC Lead for review
+   - Schedule post-incident meeting
+   - Flag for detection improvement
+
+4. IF Verdict = "False Positive":
+   - Document false positive reason
+   - Update analytic tuning notes
+   - Add to whitelist (if applicable)
+   - Link to reduce future similar alerts
+
+5. Calculate metrics:
+   - Time to Triage (MTTT)
+   - Time to Contain (MTTC)
+   - Time to Resolve (MTTR)
+   - Analyst effort hours
+
+6. Auto-archive old issues (90+ days closed)
+```
+
+---
+
+## Workflow State Diagram
+
+```
+         ┌──────────────────────────────────────┐
+         │   ALERT RECEIVED (From Splunk)       │
+         └─────────────────┬────────────────────┘
+                           │
+              ┌────────────▼────────────┐
+              │  TRIAGE COLUMN          │
+              ├─────────────────────────┤
+     RA1xxx   │ • Validate alert        │
+  Identify    │ • Extract Use-Case      │
+     +        │ • Map to MITRE-ATT&CK   │
+     Enrich   │ • Set severity          │
+              │ • Link playbook         │
+              └────────────┬────────────┘
+                           │
+              ┌────────────▼────────────┐
+              │  INVESTIGATION COLUMN   │
+              ├─────────────────────────┤
+     RA1xxx   │ • Run investigation     │
+  Continued   │   runbook               │
+     +        │ • Gather evidence       │
+     Analyze  │ • Determine verdict     │
+              │ • Escalate if needed    │
+              └────────┬────────────┬───┘
+                       │            │
+            (True)─────┘            └──────(False Positive)
+                  │                           │
+        ┌─────────▼────────────┐   ┌─────────▼──────────────┐
+        │ CONTAINMENT COLUMN   │   │ CLOSED (False Positive)│
+        ├──────────────────────┤   └──────────────────────┘
+   RA3xxx│ • Execute RA3xxx     │        (Tuning
+  Contain │   containment acts  │         whitelist)
+        │ • Block IPs/domains  │
+        │ • Revoke access      │
+        │ • Isolate systems    │
+        └──────────┬───────────┘
+                   │
+        ┌──────────▼───────────┐
+        │ ERADICATION COLUMN   │
+        ├──────────────────────┤
+   RA4xxx│ • Execute RA4xxx     │
+ Eradicate│  eradication acts   │
+        │ • Remove malware     │
+        │ • Reset credentials  │
+        │ • Collect evidence   │
+        └──────────┬───────────┘
+                   │
+        ┌──────────▼───────────┐
+        │  RECOVERY COLUMN     │
+        ├──────────────────────┤
+   RA5xxx│ • Execute RA5xxx     │
+  Recover │   recovery acts     │
+        │ • Reimage/restore    │
+        │ • Verify baseline    │
+        │ • Restore access     │
+        └──────────┬───────────┘
+                   │
+        ┌──────────▼───────────┐
+        │  CLOSED (Resolved)   │
+        ├──────────────────────┤
+   RA6xxx│ • Lessons Learned    │
+  Learn   │ • Generate report    │
+        │ • Update detection   │
+        │ • Archive issue      │
+        └──────────────────────┘
+```
+
+---
+
+## Integration Points
+
+### Splunk → JIRA (Alert Creation)
+
+**Splunk Alert Configuration:**
+```
+1. Create saved search for each analytic
+2. Set alert action: "Webhook"
+3. Webhook URL: {jira-instance}/rest/webhooks/1.0/events
+4. Payload template:
+   {
+     "alert_name": "UC-{UC_ID}",
+     "severity": "{severity}",
+     "host": "{host}",
+     "user": "{user}",
+     "timestamp": "{_time}",
+     "analytic_id": "{analytic_id}",
+     "search_id": "{search_id}"
+   }
+5. Enable: "Send on alert trigger"
+6. Throttle: Adjust per analytic (UC-001: 5m min, UC-004: real-time)
+```
+
+### JIRA → Slack (Notifications)
+
+**JIRA Webhook Configuration:**
+```
+1. Admin → Webhooks → Create Webhook
+2. Name: "SOC-Slack-Notifications"
+3. Events: 
+   - Issue Created
+   - Issue Transitioned
+   - Comment Created
+4. URL: {slack-workspace}/services/T{ID}/B{ID}/XXX
+5. JQL Filter: project = SOC-OPS
+```
+
+### JIRA → Active Directory (Enrichment)
+
+**JIRA + AD Integration:**
+```
+Trigger: Issue created with field "user"
+
+Automation Rule:
+  1. Query AD for user details
+  2. Populate fields:
+     - User Full Name
+     - Department
+     - Manager
+     - Last Logon
+     - Group Memberships
+  3. Add comment with AD context
+  4. Flag if user is sensitive (admin, executive)
+```
+
+### JIRA → Threat Intelligence (Enrichment)
+
+**JIRA + ThreatStream/AlienVault OTX:**
+```
+Trigger: Issue created with field "source_ip"
+
+Automation Rule:
+  1. Query threat intel feed for IP reputation
+  2. Add comment:
+     "🚨 IP Reputation Check:
+      - Known C2 Infrastructure: YES/NO
+      - Recent activity: {details}
+      - Blocklist status: {lists}"
+  3. Escalate if malicious IP detected
+```
+
+---
+
+## Custom Field Dependency Map
+
+```
+Alert Created
+    ↓
+Alert Name → Use-Case (dropdown)
+    ↓
+Use-Case → MITRE-ATT&CK (auto-populated)
+         → Playbook-Link (auto-linked)
+         → RE&CT-Phase (set to RA1xxx)
+    ↓
+Severity + Alert Age → SLA-Response (auto-calculated)
+                    → SLA-Resolution (auto-calculated)
+    ↓
+RE&CT-Phase → Investigation-Status (linked)
+           → Evidence-Artifacts (sub-tasks created)
+    ↓
+Investigation Complete → Verdict (set manually)
+    ↓
+Verdict Set → Closure workflow
+          → Metrics calculated
+          → Lessons learned scheduled
+```
+
+---
+
+## SLA Configuration
+
+| Severity | Response Time | Resolution Time | Escalation |
+|----------|---------------|-----------------|-----------|
+| Critical | 5 minutes | 2 hours | Immediate |
+| High | 15 minutes | 8 hours | If unresolved at 4h |
+| Medium | 1 hour | 24 hours | If unresolved at 12h |
+| Low | 4 hours | 72 hours | If unresolved at 48h |
+
+**SLA Violation Handling:**
+```
+1. If SLA-Response violated:
+   - Add comment "⏰ Response SLA Breached"
+   - Re-assign to SOC Lead
+   - Escalate severity by 1 level
+
+2. If SLA-Resolution violated:
+   - Notify Security Manager
+   - Create escalation ticket
+   - Prioritize for closure
+```
+
+---
+
+## Testing & Validation
+
+### End-to-End Workflow Test
+
+**Test Scenario: UC-001 Alert**
+
+```
+Step 1: Simulate Splunk Alert
+  - Send webhook with test data
+  - Verify JIRA ticket created in Triage
+
+Step 2: Verify Enrichment
+  - Check custom fields populated
+  - Verify playbook link present
+  - Confirm SLA dates set
+
+Step 3: Manual Transition
+  - Move to Investigation
+  - Verify assignment notification sent
+  - Check Slack message format
+
+Step 4: Verdict Setting
+  - Set verdict to "True Positive"
+  - Move to Closed
+  - Verify lessons learned ticket created
+
+Step 5: Metrics Verification
+  - Calculate MTTT, MTTC, MTTR
+  - Verify report generated
+  - Confirm issue archived after 90 days
+```
+
+**Test Data Template:**
+```json
+{
+  "alert_name": "UC-001-AdminGroupAdd",
+  "severity": "High",
+  "analytic_id": "ANALYTIC-001",
+  "host": "TEST-SERVER-01",
+  "user": "testuser@domain.com",
+  "timestamp": "2025-01-15T14:32:00Z",
+  "source_ip": "10.0.1.100",
+  "query_results": "SubjectUserName=DOMAIN\\admin, TargetUserName=testuser, count=1"
+}
+```
+
+---
+
+## Monitoring & Metrics
+
+Track these in JIRA dashboards:
+
+### Operational Metrics
+- **Alerts per day** - Volume trend
+- **Average MTTT** - Time to triage (target: 15m)
+- **Average MTTC** - Time to contain (target: 1h)
+- **Average MTTR** - Time to resolve (target: 4h)
+- **SLA compliance rate** (target: 95%)
+
+### Quality Metrics
+- **True Positive Rate** (target: 70%+)
+- **False Positive Rate** (target: <30%)
+- **Alert quality score** - composite of above
+
+### Team Metrics
+- **Alerts per analyst** - workload distribution
+- **Analyst productivity** - alerts closed per hour
+- **Training effectiveness** - error rate over time
+
+### Detection Metrics
+- **Coverage** - % of MITRE ATT&CK detected
+- **Detection improvement rate** - new detections per month
+- **Hunt findings converted** - findings → detections
+
+---
+
+## JIRA Admin Checklist
+
+- [ ] Project created: SOC-OPS
+- [ ] Custom fields configured (8 fields)
+- [ ] Board workflow configured
+- [ ] Automation rules deployed (8 rules)
+- [ ] Webhooks configured (Splunk, Slack, AD)
+- [ ] SLA rules configured per severity
+- [ ] Dashboards created for metrics
+- [ ] Team members with correct permissions
+- [ ] Test end-to-end workflow
+- [ ] Documentation shared with team
+- [ ] Escalation contacts configured
+- [ ] Archive rules configured (90-day auto-close)

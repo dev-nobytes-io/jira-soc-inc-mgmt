@@ -1,0 +1,744 @@
+# Incident Response Playbook: UC-001 - Admin Group Addition
+
+## Quick Reference
+
+| Attribute | Value |
+|-----------|-------|
+| **Severity** | High |
+| **Use Case** | UC-001 |
+| **MITRE ATT&CK** | T1098.002, T1136.001 |
+| **Analytics** | ANALYTIC-001 |
+| **Response Time SLA** | 15 minutes |
+| **Resolution SLA** | 8 hours |
+| **Team** | SOC, Active Directory Admin |
+
+---
+
+## Executive Summary
+
+Unauthorized addition of a user account to a local or domain administrative group. **Critical indicator of privilege escalation or persistence**. This playbook provides step-by-step guidance from alert to closure.
+
+---
+
+## Alert Workflow Diagram
+
+```
+SPLUNK ALERT
+   ↓
+JIRA TICKET CREATED (Triage)
+   • Custom fields populated
+   • Playbook linked
+   • SLA set: 15 min response
+   ↓
+TRIAGE PHASE (5 min)
+   • Validate alert accuracy
+   • Check group membership now
+   • Quick legitimacy assessment
+   ↓
+INVESTIGATION PHASE (5-10 min)
+   • Gather context
+   • Interview requestor/manager
+   • Determine intentionality
+   ↓
+VERDICT DECISION
+   ├─ TRUE POSITIVE → CONTAINMENT
+   ├─ FALSE POSITIVE → CLOSURE
+   └─ UNDETERMINED → ESCALATION
+   ↓
+CONTAINMENT (if needed)
+   • Revoke privileges
+   • Reset password
+   ↓
+ERADICATION
+   • Full credential reset
+   • Audit other privilege changes
+   ↓
+RECOVERY
+   • Restore baseline access
+   • Monitor user activity
+   ↓
+CLOSURE + LESSONS LEARNED
+```
+
+---
+
+## Phase 1: TRIAGE (0-5 minutes)
+
+### Step 1.1: Validate Alert
+
+**In JIRA Console:**
+
+1. Open newly created issue from JIRA
+2. Review auto-populated fields:
+   - Alert name: "UC-001-AdminGroupAdd"
+   - Severity: "High"
+   - Affected host: {computer-name}
+   - Target user: {user-account}
+   - Actor: {admin-account}
+
+3. Verify alert data in source:
+   ```
+   Query Splunk directly:
+   index=windows EventCode=4728 
+   | search Computer={computer-name} TargetUserName={target-user}
+   | table SubjectUserName, TargetUserName, Computer, _time
+   ```
+
+4. **Check current state** - Is user STILL in admin group?
+   ```
+   On DC or workstation:
+   net localgroup administrators | find "{target-user}"
+   
+   OR for Domain Group:
+   net group "Domain Admins" /domain | find "{target-user}"
+   ```
+
+5. **Document findings** in JIRA comment:
+   ```
+   ✓ Alert validated - user IS currently in admin group
+   OR
+   ⚠ Alert shows add, but user NOT in group now (may have been removed)
+   ```
+
+**Success Criteria:**
+- [ ] Alert data verified against source
+- [ ] Current group membership confirmed
+- [ ] Timeline documented
+
+---
+
+### Step 1.2: Quick Legitimacy Check
+
+**Ask these questions immediately:**
+
+1. **Is this a known system?**
+   ```
+   Is computer name recognized?
+   Is it a production server or test system?
+   Is system criticality appropriate?
+   ```
+
+2. **Is target user expected to be admin?**
+   ```
+   Is user in IT department?
+   Is user a service account?
+   Is this documented onboarding?
+   ```
+
+3. **Is timing expected?**
+   ```
+   Business hours or off-hours?
+   During IT maintenance window?
+   Correlate with change tickets
+   ```
+
+4. **Did we see this before?**
+   ```
+   Same actor adding users regularly?
+   Same user added before?
+   Pattern of expected activity?
+   ```
+
+**In JIRA, add assessment:**
+```
+QUICK ASSESSMENT: 70% likely legitimate OR 70% likely malicious
+
+REASONING:
+□ Actor is known IT admin (good)
+□ Timing aligns with maintenance window (good)
+□ No change ticket found (concern)
+□ User was previously admin (good)
+□ System is sensitive production tier-1 (concern)
+```
+
+**If 80%+ confidence it's legitimate → Close with note**
+
+**If 80%+ confidence it's malicious → Move to Investigation immediately**
+
+**If uncertain → Proceed to Investigation**
+
+**Success Criteria:**
+- [ ] Quick assessment completed
+- [ ] JIRA updated with findings
+- [ ] Decision made (investigate, close, or escalate)
+
+---
+
+## Phase 2: INVESTIGATION (5-15 minutes)
+
+### Step 2.1: Gather Contextual Evidence
+
+**RA1001: Collect Initial Evidence**
+
+1. **Extract event details from Windows Event Log 4728:**
+   ```
+   On Domain Controller:
+   Get-WinEvent -FilterHashtable @{
+     LogName='Security'
+     ID=4728
+   } -MaxEvents 100 | Where-Object {
+     $_.Properties[3].Value -eq "{target-user}"
+   } | Select-Object TimeCreated, @{
+     N='Actor';E={$_.Properties[1].Value}
+   }, @{
+     N='TargetUser';E={$_.Properties[3].Value}
+   }, @{
+     N='TargetGroup';E={$_.Properties[2].Value}
+   }, Message
+   ```
+
+2. **Document findings in evidence sub-task:**
+   ```
+   Event Details:
+   • Event ID: 4728
+   • Timestamp: {exact time}
+   • Actor: {who performed action}
+   • Target Group: {group name}
+   • Domain: {domain}
+   ```
+
+3. **Check for related activity in same timeframe:**
+   ```
+   Query for actor's other privilege changes (24h):
+   index=windows EventCode IN (4728,4732,4756) 
+   | search SubjectUserName={actor}
+   | stats count by TargetUserName, TargetGroupName, EventCode, _time
+   
+   Look for:
+   • Multiple accounts added (persistence pattern)
+   • Multiple groups modified (escalation pattern)
+   • Timing (batch operations suggest planned vs individual)
+   ```
+
+---
+
+### Step 2.2: Contact and Interview
+
+**Interview Steps:**
+
+1. **First Contact: Actor (who performed the action)**
+   ```
+   Script:
+   "Hi [Actor], I need to understand a security event from 2:30 PM today.
+    You added [Target User] to the [Group] group on [Computer].
+    Can you explain the business reason for this change?
+    Was there a change request or approval?"
+   
+   LISTEN FOR:
+   ✓ Clear, specific business reason
+   ✓ Reference to change ticket or request
+   ✓ Mention of expected user in role
+   
+   ⚠ Vague or evasive explanation
+   ⚠ No mention of ticket or request
+   ⚠ Doesn't know user or purpose
+   ⚠ "I don't remember"
+   ```
+
+2. **Second Contact: Target User Manager**
+   ```
+   Script:
+   "Hi [Manager], I need to verify a permission change.
+    [Target User] was added to [Group] today.
+    Did you approve or request this?
+    Is this part of their new role?"
+   
+   LISTEN FOR:
+   ✓ Confirms authorization and approval
+   ✓ Explains business need
+   ✓ Can reference ticket or verbal approval
+   
+   ⚠ "I don't know about this"
+   ⚠ "Why were they made admin?"
+   ⚠ No record of request
+   ```
+
+3. **Third Contact: Change Control**
+   ```
+   Query change management system:
+   
+   SEARCH FOR:
+   • Ticket created before permission change
+   • Ticket number referenced by actor
+   • Approval records
+   • Implementation logs
+   
+   EXPECTED:
+   ✓ Ticket 2-3 days before action
+   ✓ Proper approvals signed
+   ✓ Implementation details match
+   
+   ⚠ No ticket found
+   ⚠ Ticket created AFTER action
+   ⚠ No approvals
+   ```
+
+**Document all interviews in JIRA:**
+```
+INVESTIGATION FINDINGS:
+
+Interview 1 - Actor (IT Admin John):
+  Status: CONDUCTED
+  Time: 2:45 PM
+  Response: "Yes, we provisioned [User] into admin role per CH12345.
+             Ticket was approved by [Manager] yesterday."
+  
+Interview 2 - Target Manager (IT Director):
+  Status: CONDUCTED
+  Time: 2:50 PM
+  Response: "Yes, [User] was promoted to sys admin. This was planned."
+  
+Interview 3 - Change Control:
+  Status: CONFIRMED
+  Ticket: CH12345
+  Status: APPROVED by CIO
+  Implementation Date: Today as planned
+  
+ASSESSMENT: ✓ LEGITIMATE - All parties confirm authorization
+```
+
+---
+
+### Step 2.3: Risk Assessment
+
+**Determine threat level based on context:**
+
+```
+RISK ASSESSMENT MATRIX
+
+Context Factor | Low Risk | Medium Risk | High Risk
+---|---|---|---
+Actor Type | Known IT admin | Support staff | External user
+Timing | Business hours | Late evening | After-hours
+Change Ticket | Pre-approved | Post-documented | No ticket
+User Role | IT staff | Operations | Finance/Legal
+Sensitivity | Non-sensitive | Medium | Tier-1 critical
+Prior behavior | Regular provision | Occasional | No precedent
+```
+
+**For UC-001, determine verdict:**
+
+```
+TRUE POSITIVE (Malicious):
+• Change ticket MISSING
+• Actor unfamiliar with user
+• Timing suspicious (after-hours)
+• User access inappropriate for role
+• RECOMMENDATION: Revoke immediately, investigate actor
+
+FALSE POSITIVE (Legitimate):
+• Change ticket present
+• All parties confirm approval
+• Timing expected (business hours)
+• Role appropriate for user
+• RECOMMENDATION: Document and close
+
+UNDETERMINED:
+• Conflicting information
+• Can't reach all parties
+• Incomplete documentation
+• RECOMMENDATION: Escalate to IT manager
+```
+
+---
+
+## Phase 3: CONTAINMENT (if True Positive)
+
+### Step 3.1: Immediate Actions (RA3101)
+
+**Execute only if verdict = TRUE POSITIVE**
+
+```
+⏰ TIMING: Execute within 15 minutes of verdict
+
+STEP 1: Disable compromised account
+  Command:
+    Disable-ADUser -Identity {target-user} -Confirm:$false
+  
+  Verify:
+    Get-ADUser -Identity {target-user} | 
+    Select-Object Enabled
+    → Should show: False
+
+STEP 2: Revoke from admin group
+  Command:
+    Remove-ADGroupMember -Identity "Domain Admins" 
+    -Members {target-user} -Confirm:$false
+  
+  Verify:
+    Get-ADGroupMember -Identity "Domain Admins" | 
+    Where-Object {$_.SAMAccountName -eq "{target-user}"}
+    → Should return nothing
+
+STEP 3: Terminate existing sessions
+  Command:
+    quser /server:{affected-servers}
+    logoff {SessionID} /server:{server}
+  
+  OR if remote:
+    Get-RDUserSession -ComputerName {server} | 
+    Where-Object {$_.UserName -match "{target-user}"} | 
+    Invoke-RDUserLogoff
+
+STEP 4: Reset password
+  Command:
+    $NewPassword = -join ((33..126) | Get-Random -Count 25 | 
+    ForEach-Object {[char]$_})
+    Set-ADAccountPassword -Identity {target-user} 
+    -NewPassword (ConvertTo-SecureString -AsPlainText 
+    $NewPassword -Force) -Reset -Confirm:$false
+  
+  Log result:
+    "Password reset to: [saved in secure location]"
+    Date: {timestamp}
+    Admin: {your-account}
+
+STEP 5: Document in JIRA
+  Add comment:
+    "CONTAINMENT EXECUTED:
+    ✓ Account disabled
+    ✓ Removed from Domain Admins
+    ✓ Sessions terminated
+    ✓ Password reset
+    Time: {timestamp}
+    Admin: {account}"
+```
+
+**Success Criteria:**
+- [ ] Account disabled
+- [ ] Admin group membership revoked
+- [ ] All sessions terminated
+- [ ] Password reset and secured
+- [ ] All actions documented with timestamps
+
+---
+
+### Step 3.2: Scope Check
+
+**Determine if compromise is broader:**
+
+```
+THREAT ACTOR MAY HAVE:
+□ Used account for lateral movement
+□ Created additional admin accounts
+□ Accessed sensitive systems
+□ Exfiltrated data
+
+SEARCH FOR:
+1. Other privilege changes by this account:
+   index=windows EventCode=4728 
+   | search TargetUserName={target-user}
+   | stats count by TargetGroupName
+   
+2. Logons from suspicious locations:
+   index=windows EventCode=4624 
+   | search TargetUserName={target-user}
+   | search NOT SourceIPAddress IN (lookup whitelist)
+   | table SourceIPAddress, TargetUserName, _time
+   
+3. Lateral movement attempts:
+   index=windows EventCode=4688 
+   | search User={target-user}
+   | search CommandLine="*psexec*" OR CommandLine="*wmic*"
+   | table CommandLine, Computer, _time
+
+RESULT:
+□ No additional activity (isolated incident)
+□ Additional activity detected (escalate to incident)
+```
+
+---
+
+## Phase 4: ERADICATION (if True Positive)
+
+### Step 4.1: Full Credential Reset (RA4101)
+
+**Extended remediation beyond containment:**
+
+```
+STEP 1: Domain-wide privilege audit
+  Query for all times this account was in privileged groups:
+  
+  Get-ADObject -Filter * -Properties whenCreated, whenChanged | 
+  Where-Object {$_.whenChanged -gt (Get-Date).AddDays(-30)} | 
+  Get-ADGroupMember | 
+  Where-Object {$_.objectClass -eq 'user'}
+  
+  → Document all privilege grants in last 30 days
+
+STEP 2: Reset related service accounts
+  If {target-user} is service account:
+  • Find all services running as this account
+  • Identify dependent services
+  • Reset to random 25-char password
+  • Update service credentials:
+    Set-Service -Name {ServiceName} 
+    -Credential {new-credential} -Force
+  • Restart services:
+    Restart-Service -Name {ServiceName} -Force
+
+STEP 3: Force password reset for admin accounts
+  If account accessed admin systems:
+  Get-ADGroupMember "Domain Admins" | 
+  ForEach-Object {
+    Set-ADUser -Identity $_ 
+    -ChangePasswordAtLogon $true
+  }
+  
+  Notify all admins:
+  "Due to security incident, reset your password
+   at next logon. Contact [email] if issues."
+
+STEP 4: Clear Kerberos tickets
+  If Kerberos abuse possible:
+  klist -li 0x3e7 purge
+  
+  → Clears all cached credentials
+```
+
+---
+
+### Step 4.2: Persistence Check
+
+**Verify no backdoors left by attacker:**
+
+```
+IF account was used to add admin:
+□ Check for scheduled tasks:
+  schtasks /query /fo list /v | 
+  grep -i {target-user}
+  → Should return nothing
+
+□ Check registry autorun:
+  Get-ItemProperty "HKLM:\Software\Microsoft\Windows\Run" | 
+  Select-Object {$_ -match "user"}
+  → Should return nothing
+
+□ Check for WMI subscriptions:
+  Get-WmiObject -Namespace root\subscription 
+  -Class __EventFilter
+  → Should not include attacker activity
+
+IF FOUND: Delete suspicious entries
+  Remove-ItemProperty -Path {path} -Name {item}
+```
+
+---
+
+## Phase 5: RECOVERY (if True Positive)
+
+### Step 5.1: Restore Legitimate Access
+
+**If this was a mistaken action, restore user to baseline:**
+
+```
+STEP 1: Verify user should NOT be admin
+  Confirm with manager:
+  "Based on investigation, [User] should not have admin.
+   Keeping them disabled until you confirm business need."
+
+STEP 2: If restoration needed:
+  □ Get manager approval (email documented)
+  □ Document business justification
+  □ Add to appropriate groups (not admin):
+    Add-ADGroupMember -Identity "IT Support" 
+    -Members {target-user}
+  □ Reset password again (new random)
+  □ Re-enable account:
+    Enable-ADUser -Identity {target-user}
+  □ Require password change at next logon:
+    Set-ADUser -Identity {target-user} 
+    -ChangePasswordAtLogon $true
+
+STEP 3: Monitor restored access
+  Set 30-day monitoring:
+  • Track all logons
+  • Monitor for privilege use
+  • Alert on off-hours access
+```
+
+---
+
+## Phase 6: CLOSURE & LESSONS LEARNED
+
+### Step 6.1: Incident Summary
+
+**In JIRA, set verdict and create closure:**
+
+```
+INCIDENT SUMMARY
+
+Case: SOC-OPS-1234
+Use Case: UC-001 - Admin Group Addition
+Verdict: TRUE POSITIVE (Unauthorized privilege escalation)
+
+TIMELINE:
+14:32:00 - User added to Domain Admins
+14:33:15 - Alert fired in Splunk
+14:33:45 - JIRA ticket created
+14:35:00 - Initial investigation started
+14:37:00 - Actor contacted - unable to explain action
+14:38:00 - Manager confirmed NO authorization
+14:39:00 - Containment executed
+14:40:00 - Account disabled, privileges revoked
+14:45:00 - Scope check completed (isolated incident)
+
+IMPACT:
+• Dwell time: ~13 minutes (from action to containment)
+• Accounts compromised: 1
+• Systems compromised: 0 (prevented by rapid containment)
+• Data exposed: None detected
+
+ROOT CAUSE:
+Attacker compromised {actor-account} and used legitimate admin
+to escalate to Domain Admins. No change ticket control prevented unauthorized action.
+
+METRICS:
+• MTTT (Mean Time to Triage): 3 minutes ✓
+• MTTD (Mean Time to Detect): 1.5 minutes ✓
+• MTTC (Mean Time to Contain): 7 minutes ✓
+• MTTR (Mean Time to Resolve): 12 minutes ✓
+• SLA Response: 15 min target, 3 min actual ✓
+• SLA Resolution: 8 hour target, 12 min actual ✓
+```
+
+### Step 6.2: Detection Improvement
+
+**Add to RA6002: Detection Improvement**
+
+```
+WHAT WORKED:
+✓ ANALYTIC-001 detected the event within 2 minutes
+✓ Fast JIRA automation enabled quick investigation
+✓ Clear use case runbook guided investigation
+✓ Rapid containment prevented further damage
+
+WHAT DIDN'T WORK:
+⚠ Couldn't detect when actor account was compromised (no SIEM)
+⚠ No multi-factor authentication on admin accounts
+⚠ No approval workflow requirement in change control
+
+IMPROVEMENTS TO IMPLEMENT:
+1. Deploy EDR to detect credential compromise
+   • Timeline: 30 days
+   • Owner: SOC Lead
+   
+2. Implement MFA for all admin accounts
+   • Timeline: 60 days
+   • Owner: IAM Team
+   
+3. Require change ticket BEFORE privilege changes
+   • Timeline: Immediate
+   • Owner: IT Security
+   
+4. Add detection for admin account compromise
+   • Timeline: 14 days
+   • Owner: SOC Detection Engineering
+```
+
+### Step 6.3: Update Runbook
+
+**Document findings for future incidents:**
+
+```
+UC-001 LESSONS LEARNED:
+
+False Positive Pattern Discovered:
+• Admin provisioning on scheduled dates often has no ticket
+• Change management system behind by 1-2 days
+• Adding explicit date-based exceptions reduces false positives
+
+Improvement:
+• Check change tickets from past 48 hours (not just today)
+• Filter known IT admins during known onboarding windows
+• Whitelist expected admins for 30 days post-hire
+
+New Tuning:
+• Skip alert if matching approved admin + onboarding date
+• Maintain "Approved Admins" lookup table
+• Update monthly with new hires
+```
+
+---
+
+## Team Roles & Responsibilities
+
+| Role | Responsibility | Timeline |
+|------|---|---|
+| **On-Call Analyst** | Initial triage, interview, investigation | 5-15 min |
+| **SOC Lead** | Escalation decisions, containment approval | 10-20 min |
+| **AD Administrator** | Execute containment commands, credential reset | 5-10 min |
+| **IT Manager** | Verify legitimacy, approve access restoration | 5 min |
+| **Security Manager** | Incident approval, executive notification | 15+ min |
+
+---
+
+## Quick Command Reference
+
+```powershell
+# Verify group membership
+Get-ADGroupMember -Identity "Domain Admins" | Where-Object {$_.SamAccountName -eq "username"}
+
+# Remove from admin group
+Remove-ADGroupMember -Identity "Domain Admins" -Members "username" -Confirm:$false
+
+# Disable account
+Disable-ADUser -Identity "username" -Confirm:$false
+
+# Reset password
+$NewPassword = -join ((33..126) | Get-Random -Count 25 | ForEach-Object {[char]$_})
+Set-ADAccountPassword -Identity "username" -NewPassword (ConvertTo-SecureString -AsPlainText $NewPassword -Force) -Reset
+
+# Terminate session
+logoff {SessionID} /server:{servername}
+
+# Force password change at next logon
+Set-ADUser -Identity "username" -ChangePasswordAtLogon $true
+```
+
+---
+
+## Escalation Decision Tree
+
+```
+ALERT RECEIVED
+  ↓
+IS IT VALID ALERT? (Check Splunk data)
+  ├─ NO → Tune detection, Close ticket
+  └─ YES ↓
+  
+IS ACCOUNT STILL ADMIN? (Current state check)
+  ├─ NO → Investigate removal, Close ticket
+  └─ YES ↓
+  
+CAN WE QUICKLY CONFIRM LEGITIMACY?
+  ├─ YES (change ticket, manager approval) → Close ticket
+  └─ NO ↓
+  
+IS ACTOR AVAILABLE FOR INTERVIEW?
+  ├─ YES → Interview, determine verdict
+  │  ├─ Confirmed legitimate → Close
+  │  └─ Cannot confirm → Escalate
+  └─ NO → Escalate to IT Manager
+  
+ESCALATION TO INCIDENT (RA3xxx):
+  • Move to Containment
+  • Execute privilege revocation
+  • Investigate attacker account
+  • Audit for lateral movement
+```
+
+---
+
+## Post-Incident Checklist
+
+- [ ] JIRA ticket updated with verdict
+- [ ] All evidence collected and linked
+- [ ] Affected user notified (if legitimate)
+- [ ] Affected user's manager notified
+- [ ] IT Security notified (if attack)
+- [ ] Detection improvement noted
+- [ ] Runbook updated with new learnings
+- [ ] Team debriefing scheduled (if critical)
+- [ ] Metrics calculated and logged
+- [ ] Training materials updated

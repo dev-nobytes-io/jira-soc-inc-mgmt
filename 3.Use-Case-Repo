@@ -1,0 +1,594 @@
+# Use Cases Repository
+
+## UC-001: Local Administrator Group Modification
+
+**Severity:** High  
+**MITRE ATT&CK:** T1098.002 (Account Manipulation - Domain Account), T1136.001 (Create Account - Local)  
+**Analytics:** ANALYTIC-001  
+**Detection Method:** Windows Event Log 4728 (Group Membership Change)
+
+### Overview
+Unauthorized addition of user accounts to local or domain administrative groups. Critical indicator of privilege escalation or persistence.
+
+### Investigation Runbook
+1. **Immediate Actions**
+   - Confirm group membership change: `Get-LocalGroupMember -Group "Administrators" | Where Name -like "*TargetUser*"`
+   - Check change timestamp matches alert
+   - Verify account still in group (may have been removed)
+
+2. **Contextual Investigation**
+   - Who performed the action? (SubjectUserName)
+   - When was it done? (compare to work schedule)
+   - Was a change ticket created? (JIRA correlation)
+   - Any other privileged actions by this actor? (search last 24h)
+
+3. **Determine Legitimacy**
+   - Contact requesting manager/ticket owner
+   - Verify against change control process
+   - Check if account is documented service account
+   - Compare to historical baseline (expected frequency)
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Document account addition timestamp | RA1001 |
+| Identification | Identify all actors and systems involved | RA1002 |
+| Containment | Revoke privileges if unauthorized | RA3101 |
+| Eradication | Reset account password | RA4101 |
+| Recovery | Restore group membership to baseline | RA5101 |
+| Lessons Learned | Document in post-incident review | RA6101 |
+
+### Escalation Criteria
+- **To Incident:** Unauthorized addition + evidence of malicious activity
+- **To Executive:** Multiple accounts added, cross-domain scope, credential access evidence
+- **False Close:** Confirmed change request, documented business need, proper approval
+
+### Known False Positives
+- Help desk provisioning (filter SubjectUserName = "Service.Account")
+- Delegation during admin absence
+- Automated onboarding processes
+
+### Tuning Guidance
+- Create lookup: `approved_admin_accounts.csv` with service accounts
+- Exclude expected monthly baseline additions
+- Alert on every occurrence for tier-1 accounts
+
+---
+
+## UC-002: Suspicious Process Execution - LOLBAS
+
+**Severity:** Medium-High  
+**MITRE ATT&CK:** T1059.001 (Command and Scripting - PowerShell), T1562.010 (Impair Defenses - Disable Windows Defender)  
+**Analytics:** ANALYTIC-002  
+**Detection Method:** Sysmon Event 1 (Process Creation)
+
+### Overview
+Execution of living-off-the-land binaries (LOLBAS) with suspicious command-line arguments. Indicates potential defense evasion or command execution.
+
+### Investigation Runbook
+1. **Process Analysis**
+   - Review full CommandLine (not just name)
+   - Check ParentImage (who launched this process?)
+   - Validate User context (legitimate admin or suspicious account?)
+   - Check timestamp (business hours? maintenance window?)
+
+2. **Behavioral Analysis**
+   - Is process known to execute with these arguments?
+   - Any encoded/obfuscated content in command line?
+   - Did process create child processes? (look for cmd.exe, powershell.exe spawns)
+   - Network connections from process? (outbound to external IP?)
+
+3. **Context Check**
+   - Is user a known sysadmin? (cross-reference staff list)
+   - Was host recently patched? (exclude Windows Update processes)
+   - Any other suspicious activity from this host in last 24h?
+   - Correlation with change tickets or maintenance windows?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Capture full command line and parent process | RA1001 |
+| Identification | Determine process intent (legitimate vs suspicious) | RA1003 |
+| Containment | Terminate process if malicious | RA3201 |
+| Eradication | Remove persistence mechanisms if present | RA4201 |
+| Recovery | Restore baseline system configuration | RA5201 |
+| Lessons Learned | Update detection if novel technique | RA6201 |
+
+### Escalation Criteria
+- **To Incident:** Obfuscated command + outbound network connection
+- **To Containment:** Process still running, evidence of child processes
+- **False Close:** Documented admin maintenance, change ticket matched, known-good parent
+
+### Known False Positives
+- Antivirus/EDR scans using certutil
+- Admin PowerShell sessions (legitimate use)
+- Windows Update/SCCM processes
+- Legitimate encoding for software distribution
+
+### Tuning Guidance
+- Whitelist: service accounts performing legitimate tasks
+- Document approved LOLBAS usage in comments
+- Focus on obfuscation indicators (-nop, -enc, -bypass)
+- Review parent process context (svchost spawning PowerShell = suspicious)
+
+---
+
+## UC-003: Brute Force - Failed Login Spike
+
+**Severity:** Medium  
+**MITRE ATT&CK:** T1110.001 (Brute Force - Password Guessing)  
+**Analytics:** ANALYTIC-003  
+**Detection Method:** Windows Event Log 4625 (Failed Logon)
+
+### Overview
+Rapid sequence of failed login attempts against a user or system. Indicates potential credential attack or misconfiguration.
+
+### Investigation Runbook
+1. **Characterize Attack**
+   - Count total failed attempts in alert window
+   - Target account(s) - single account or multiple?
+   - Source IP(s) - single attacker or distributed?
+   - Time window - sustained attack or isolated burst?
+
+2. **Validate Threat**
+   - Check if source IP is internal or external
+   - Does target account exist? (typo attacks)
+   - Account lockout status? (protected by policy?)
+   - Any successful login after failures? (breach indicator)
+
+3. **Source Investigation**
+   - Internal source: Device misconfiguration? (cached creds)
+   - External source: Known attacker? (check threat intel)
+   - Does source IP match known VPN/proxy? (false positive?)
+   - Geographic anomaly? (Impossible travel?)
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Confirm target account and source IP | RA1001 |
+| Identification | Check for successful breach (post-attack auth) | RA1002 |
+| Containment | Reset target account password | RA3101 |
+| Containment | Block source IP if external threat | RA3301 |
+| Eradication | Scan target for malware if compromised | RA4401 |
+| Lessons Learned | Update password policy if needed | RA6301 |
+
+### Escalation Criteria
+- **To Incident:** Successful login after brute force
+- **To Network Team:** External source, high volume (100+)
+- **False Close:** Internal misconfiguration (app retry logic), documented maintenance
+
+### Known False Positives
+- User entering wrong password repeatedly
+- Cached credential failures (VPN users, mobile)
+- Service account restarting with wrong password
+- Scheduled task misconfiguration
+
+### Tuning Guidance
+- Internal threshold: 10+ in 5 minutes
+- External threshold: 5+ in 5 minutes
+- Whitelist: service accounts during password rotation
+- Exclude: known VPN/proxy IPs, load balancers
+
+---
+
+## UC-004: OS Credential Dumping - LSASS Access
+
+**Severity:** Critical  
+**MITRE ATT&CK:** T1003.001 (OS Credential Dumping - LSASS Memory)  
+**Analytics:** ANALYTIC-004  
+**Detection Method:** Sysmon Event 10 (Process Access)
+
+### Overview
+Suspicious process accessing Local Security Authority Subsystem Service (LSASS) memory. Direct indicator of credential theft attempt (mimikatz, etc.).
+
+### Investigation Runbook
+1. **Source Process Analysis**
+   - What process is accessing LSASS?
+   - Does process have legitimate reason to access LSASS?
+   - User context - SYSTEM or user account?
+   - Parent process - how was suspicious process launched?
+
+2. **Verify Whitelisting**
+   - Is source process in approved whitelist?
+   - Is it from security tool (EDR, AV)?
+   - Check vendor (Microsoft, Crowdstrike, etc.)
+   - Validate software version and path
+
+3. **Investigate Parent Chain**
+   - How was suspicious process started?
+   - Chain: User interaction → suspicious process → LSASS
+   - Evidence of command injection or exploitation?
+   - Timeline: correlation with other suspicious events?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Capture full process chain (parent → child) | RA1001 |
+| Identification | Determine if credentials were exfiltrated | RA1002 |
+| Containment | Isolate host immediately (network isolation) | RA3001 |
+| Eradication | Terminate malicious process | RA4001 |
+| Eradication | Reset credentials of affected accounts | RA4101 |
+| Recovery | Reimage/remediate host | RA5001 |
+| Lessons Learned | Post-incident analysis | RA6001 |
+
+### Escalation Criteria
+- **To Incident (Critical):** Any non-whitelisted process accessing LSASS
+- **To Containment:** Immediate network isolation required
+- **No False Close:** This is high-confidence attack indicator
+
+### Known False Positives
+- Legitimate EDR/AV products (whitelist vendor processes)
+- Windows Update accessing memory (rare, validate)
+- Legitimate admin tools (document and approve)
+
+### Tuning Guidance
+- Maintain strict whitelist of approved processes
+- Zero tolerance - investigate every alert
+- High confidence indicator - minimal tuning
+- Alert on every occurrence
+
+---
+
+## UC-005: Lateral Movement - RPC/WMI Abuse
+
+**Severity:** High  
+**MITRE ATT&CK:** T1021.003 (Distributed Component Object Model), T1047 (Windows Management Instrumentation)  
+**Analytics:** ANALYTIC-005  
+**Detection Method:** Sysmon Event 3 (Network Connection) + Event 1 (Process Creation)
+
+### Overview
+Suspicious remote administrative connections (RPC 135, SMB 445, WinRM 5985/5986) from non-admin processes or unauthorized users.
+
+### Investigation Runbook
+1. **Connection Analysis**
+   - Source process: PowerShell, cmd.exe, wmic.exe?
+   - Destination: what systems are being targeted?
+   - Destination port: 135 (RPC), 445 (SMB), 5985 (WinRM)?
+   - User context: admin, service account, or regular user?
+
+2. **Behavioral Analysis**
+   - Is this normal admin activity? (on-call maintenance?)
+   - Frequency: single connection or repeated to multiple hosts?
+   - Timing: business hours, after-hours, weekend?
+   - Other concurrent activity: file access, registry changes?
+
+3. **Intent Determination**
+   - Tool analysis: legitimate admin vs attack tool?
+   - Process lifetime: short-lived (suspicious) or normal?
+   - Success indicators: did connection succeed?
+   - Follow-on activity: what happened after connection?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Document source/destination and process details | RA1001 |
+| Identification | Determine if legitimate admin activity | RA1003 |
+| Containment | Block lateral movement if unauthorized | RA3201 |
+| Containment | Revoke credentials if compromised | RA3101 |
+| Eradication | Terminate malicious processes | RA4201 |
+| Recovery | Baseline and restore affected systems | RA5201 |
+| Lessons Learned | Update detection or admin processes | RA6201 |
+
+### Escalation Criteria
+- **To Incident:** Unauthorized user + successful connection + follow-on activity
+- **To Network:** High volume lateral movement (>10 targets)
+- **False Close:** Documented admin, authorized, logged in change control
+
+### Known False Positives
+- Legitimate admin remote sessions (whitelist by account/time)
+- Scheduled admin tasks
+- Backup/monitoring systems using WMI
+- System administrators performing maintenance
+
+### Tuning Guidance
+- Whitelist: known admin accounts with time-of-day windows
+- Exclude: domain controllers talking to each other
+- Review context: is this expected for this user?
+- Document approved lateral movement patterns
+
+---
+
+## UC-006: Data Exfiltration - Large Outbound Transfer
+
+**Severity:** High  
+**MITRE ATT&CK:** T1041 (Exfiltration Over C2 Channel), T1048 (Exfiltration Over Alternative Protocol)  
+**Analytics:** ANALYTIC-006  
+**Detection Method:** Syslog/NetFlow (Network Flow Data)
+
+### Overview
+Abnormally large outbound data transfer to external IP address or unusual destination. Potential indicator of data theft or C2 communication.
+
+### Investigation Runbook
+1. **Data Characterization**
+   - Total volume transferred in time window?
+   - Sustained transfer or burst?
+   - Protocol: HTTP/HTTPS, DNS, TCP, UDP?
+   - Destination: known service (cloud, CDN) or suspicious?
+
+2. **Source Analysis**
+   - Which host/user initiated transfer?
+   - Is user expected to perform large transfers?
+   - Normal destination for this user/host?
+   - Time of day: business hours or suspicious?
+
+3. **Destination Investigation**
+   - Destination IP geolocation: expected or anomalous?
+   - Known entity: cloud service, ISP, threat actor infrastructure?
+   - Reverse DNS: legitimate domain?
+   - Threat intelligence: IP in blocklist?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Analyze traffic content if possible | RA1001 |
+| Identification | Determine data sensitivity of source | RA1002 |
+| Containment | Block destination IP/domain | RA3301 |
+| Containment | Isolate source host if breach confirmed | RA3001 |
+| Eradication | Remove malware/backdoor from source | RA4401 |
+| Recovery | Restore host and verify data integrity | RA5001 |
+| Lessons Learned | Review DLP policies and controls | RA6401 |
+
+### Escalation Criteria
+- **To Incident:** Sensitive data + external destination + malware indicators
+- **To Executive:** Data classification indicates PII/PHI/trade secrets
+- **False Close:** Legitimate cloud service, documented backup, approved transfer
+
+### Known False Positives
+- Cloud backup services (Dropbox, OneDrive, Google Drive)
+- Software updates/downloads
+- Legitimate video/media streaming
+- Approved vendor connectivity
+
+### Tuning Guidance
+- Create lookup: `trusted_external_ips.csv` with legitimate destinations
+- Whitelist cloud services by domain
+- Adjust volume threshold for environment baseline
+- Review monthly to add new legitimate destinations
+
+---
+
+## UC-007: Privilege Escalation - Token Impersonation
+
+**Severity:** High  
+**MITRE ATT&CK:** T1134 (Access Token Manipulation), T1548 (Abuse Elevation Control Mechanism)  
+**Analytics:** ANALYTIC-007  
+**Detection Method:** Sysmon Event 8 (CreateRemoteThread)
+
+### Overview
+Suspicious process injection into privileged system process. Indicator of privilege escalation or lateral movement using token impersonation.
+
+### Investigation Runbook
+1. **Process Chain Analysis**
+   - Source process: cmd.exe, PowerShell, rundll32?
+   - Target process: explorer, svchost, lsass? (privilege level?)
+   - User context: regular user attempting escalation?
+   - Injection method: CreateRemoteThread detected
+
+2. **Source Legitimacy**
+   - Is user account admin or regular user?
+   - Parent of source process: legitimate?
+   - Command line: suspicious arguments?
+   - Timing: expected maintenance or unexpected?
+
+3. **Intent Determination**
+   - Success: did injection succeed? Follow-on activity?
+   - Tooling: known attack tool (Metasploit, Cobalt Strike)?
+   - Access gained: what capabilities does attacker have now?
+   - Persistence: evidence of persistence mechanism?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Capture full process chain and context | RA1001 |
+| Identification | Analyze injected code if available | RA1002 |
+| Containment | Terminate source and target processes | RA3201 |
+| Containment | Isolate host from network | RA3001 |
+| Eradication | Remove backdoor/malware | RA4401 |
+| Recovery | Reimage host or restore from backup | RA5001 |
+| Lessons Learned | Update detection and hardening | RA6201 |
+
+### Escalation Criteria
+- **To Incident (Critical):** Regular user + injection + outbound connections
+- **To Containment:** Immediate isolation required
+- **No False Close:** High-confidence privilege escalation
+
+### Known False Positives
+- Legitimate security tools (whitelist vendor processes)
+- Administrator tools (rare - document)
+- Windows Update/system processes (validate thoroughly)
+
+### Tuning Guidance
+- Maintain strict whitelist of approved processes
+- Exclude SYSTEM account activity
+- Focus on user-account privilege escalation
+- High confidence - minimal false positive tuning
+
+---
+
+## UC-008: Insider Threat - Unusual Data Access
+
+**Severity:** Medium-High  
+**MITRE ATT&CK:** T1020 (Automated Exfiltration), T1030 (Data Transfer Size Limits)  
+**Analytics:** ANALYTIC-006 (adapted for data access patterns)  
+**Detection Method:** File Server Auditing, SIEM Correlation
+
+### Overview
+Legitimate user accessing unusually large volume of files outside normal job function. Potential insider threat or compromised credential.
+
+### Investigation Runbook
+1. **Access Pattern Analysis**
+   - What files accessed? (sensitive categories?)
+   - Scope: single directory or widespread?
+   - Volume: files per minute? (unusual?)
+   - Source: device owner or remote session?
+
+2. **Baseline Comparison**
+   - Normal file access for this user: 50 files/day?
+   - Alert shows: 500 files in 1 hour?
+   - Job function relevance: should they access these files?
+   - Timing: during shift or off-hours access?
+
+3. **Contextual Investigation**
+   - Device: owned by user or shared system?
+   - Remote access: normal for this user?
+   - Concurrent activity: unusual process execution?
+   - Alerts: any suspicious logon or process activity?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Document accessed files and timeline | RA1001 |
+| Identification | Determine if credential compromise vs intent | RA1003 |
+| Containment | Reset user credentials if compromised | RA3101 |
+| Containment | Revoke access if insider threat confirmed | RA3101 |
+| Eradication | Scan for malware if account compromised | RA4401 |
+| Recovery | Restore user access with monitoring | RA5101 |
+| Lessons Learned | Review privilege and monitoring controls | RA6301 |
+
+### Escalation Criteria
+- **To Incident:** Sensitive data access + exfiltration evidence
+- **To HR/Legal:** Confirmed insider threat + data loss
+- **False Close:** Legitimate job function, documented access pattern
+
+### Known False Positives
+- Legitimate duty rotation (new assignment)
+- Data migration/consolidation projects
+- Backup/archival processes
+- Authorized security review/audit
+
+### Tuning Guidance
+- Establish baseline access patterns per role
+- Alert on >3x normal file access volume
+- Focus on sensitive data directories
+- Coordinate with HR on legitimate duty changes
+
+---
+
+## UC-009: Malware Persistence - Scheduled Task Creation
+
+**Severity:** High  
+**MITRE ATT&CK:** T1053.005 (Scheduled Task), T1547 (Boot or Logon Autostart Execution)  
+**Analytics:** New detection needed (Windows Event Log 4688 + command line monitoring)  
+**Detection Method:** Sysmon Event 1 + Windows Event Log 4698
+
+### Overview
+Suspicious scheduled task creation, particularly with obfuscated or hidden task settings. Indicator of malware persistence mechanism.
+
+### Investigation Runbook
+1. **Task Analysis**
+   - Task name: legitimate or suspicious?
+   - Trigger: daily, on-logon, at system start?
+   - Action: program path and arguments?
+   - Command line: encoded, obfuscated, or suspicious?
+
+2. **Creator Context**
+   - Who created task? (SYSTEM, user, service account?)
+   - User privilege level: admin or regular user?
+   - Timing: business hours or after-hours?
+   - Parent process: direct execution or injected?
+
+3. **Execution Intent**
+   - Task purpose: clear or hidden?
+   - Command target: legitimate system binary or suspicious tool?
+   - Network capability: C2 communication?
+   - Persistence duration: will survive reboot?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Export scheduled task definition | RA1001 |
+| Identification | Determine intent and risk level | RA1003 |
+| Containment | Disable task immediately | RA3201 |
+| Eradication | Delete suspicious task | RA4201 |
+| Eradication | Remove associated malware | RA4401 |
+| Recovery | Verify no other persistence mechanisms | RA5201 |
+| Lessons Learned | Update detection and hardening | RA6201 |
+
+### Escalation Criteria
+- **To Incident:** Obfuscated command + outbound connections + evasion indicators
+- **To Containment:** Active malware execution
+- **False Close:** Documented maintenance task, change ticket present
+
+### Known False Positives
+- Legitimate admin scheduled tasks (document and exclude)
+- Software vendor tasks (Microsoft, Adobe, etc.)
+- User scheduled backups or scripts
+- Legitimate automation processes
+
+### Tuning Guidance
+- Monitor scheduled task creation (4698) with high sensitivity
+- Exclude known legitimate tasks by name pattern
+- Flag obfuscated commands for review
+- High confidence indicator - investigate all
+
+---
+
+## UC-010: Defense Evasion - Firewall/AV Disable
+
+**Severity:** Critical  
+**MITRE ATT&CK:** T1562.004 (Disable or Modify System Firewall), T1562.001 (Disable or Modify Tools)  
+**Analytics:** New detection needed (Windows Event Log 4688 + process monitoring)  
+**Detection Method:** Sysmon Event 1 + Windows Defender/Firewall logs
+
+### Overview
+Process or command disabling Windows Defender, Firewall, or other security controls. Critical indicator of compromise and active defense evasion.
+
+### Investigation Runbook
+1. **Control Modification**
+   - Which control disabled? (Firewall, Defender, UAC?)
+   - Verification: check current security posture
+   - Timing: when was control disabled?
+   - Reversion: still disabled or re-enabled later?
+
+2. **Source Process**
+   - Executable path: legitimate location or suspicious?
+   - Parent process: how was this initiated?
+   - Command line: explicit disable command?
+   - User: SYSTEM, admin, or regular user?
+
+3. **Attacker Intent**
+   - Why disable defenses? (hiding activity?)
+   - Timing: before or after other suspicious activity?
+   - Follow-on: what happened after defense disabled?
+   - Sophistication: targeted or opportunistic?
+
+### Response Actions (RE&CT Mapping)
+| Phase | Action | RE&CT Code |
+|-------|--------|-----------|
+| Identification | Confirm current security posture | RA1001 |
+| Identification | Identify all activity during defense gap | RA1002 |
+| Containment | Isolate host immediately | RA3001 |
+| Eradication | Re-enable all security controls | RA4201 |
+| Eradication | Remove malware/attacker code | RA4401 |
+| Recovery | Restore from backup or reimage | RA5001 |
+| Lessons Learned | Force-enable GPO controls to prevent | RA6301 |
+
+### Escalation Criteria
+- **To Incident (Critical):** Immediate - any defense evasion
+- **To Containment:** Network isolation required immediately
+- **No False Close:** Zero tolerance for defense evasion
+
+### Known False Positives
+- Legitimate troubleshooting by IT (document and track)
+- Group Policy enforcement (expected on systems)
+- Rare - most alerts are genuine threats
+
+### Tuning Guidance
+- Zero tolerance - investigate every alert immediately
+- Immediate escalation to incident response
+- Create alert for Defender disable events (EventID varies)
+- Monitor GPO audit logs for policy changes
+- Consider forced GPO remediation
+
+---
+
+## Use Case Deployment Checklist
+
+- [ ] Map each UC to Splunk analytic
+- [ ] Test investigation runbooks in sandbox
+- [ ] Document escalation contacts
+- [ ] Create JIRA automation rules per UC
+- [ ] Schedule UC deep-dives with team
+- [ ] Establish false positive baseline for each UC
+- [ ] Document approved exceptions (whitelists)
+- [ ] Monthly review of UC effectiveness

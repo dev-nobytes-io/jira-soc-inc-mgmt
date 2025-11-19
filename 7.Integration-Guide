@@ -1,0 +1,608 @@
+# SOC Framework Integration Guide
+
+## Overview
+
+This document explains how all framework components (Detection, RE&CT, MITRE ATT&CK, Playbooks, Runbooks, JIRA) integrate into a cohesive incident response system.
+
+---
+
+## Complete Data Flow
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    DETECTION LAYER (Splunk)                      │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│ Windows Events (4624, 4625, 4728, 4688)                          │
+│ Sysmon Events (1, 3, 8, 10)                                      │
+│ Syslog data                                                      │
+│                    ↓                                              │
+│            7 Core Analytics                                      │
+│  ANALYTIC-001 through ANALYTIC-007                              │
+│  (See 01-Analytics-Repository.md)                               │
+│                    ↓                                              │
+│         Alert Conditions Met → FIRE ALERT                        │
+│                                                                   │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                    Webhook Payload
+                    {
+                      alert_name: "UC-001"
+                      severity: "High"
+                      host: "SERVER-001"
+                      user: "user@domain.com"
+                      timestamp: "2025-01-15T14:32:00Z"
+                    }
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│               ORCHESTRATION LAYER (JIRA SOC-OPS)                 │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  AUTOMATION RULE 1: Alert Ingestion & Enrichment                │
+│  • Create JIRA ticket in Triage column                          │
+│  • Set title: "[High] UC-001 - Admin Added to Group"            │
+│  • Extract Use-Case from alert name (UC-001)                    │
+│  • Set severity field                                           │
+│                    ↓                                              │
+│  AUTOMATION RULE 2: Use Case & RE&CT Mapping                    │
+│  • Look up use case document                                    │
+│  • Set MITRE-ATT&CK field: T1098.002                           │
+│  • Set RE&CT-Phase field: RA1xxx (Identification)              │
+│  • Link to playbook: 12-Playbooks-UC-001.md                     │
+│  • Add comment with use case summary                            │
+│                    ↓                                              │
+│  AUTOMATION RULE 3: Assignment & SLA                            │
+│  • Assign to on-call analyst                                    │
+│  • Set SLA-Response: 15 minutes                                 │
+│  • Set SLA-Resolution: 8 hours                                  │
+│  • Send Slack notification                                      │
+│                    ↓                                              │
+│              TICKET READY FOR INVESTIGATION                     │
+│                                                                   │
+│  Custom Fields Set:                                              │
+│  • Use-Case: UC-001                                             │
+│  • MITRE-ATT&CK: T1098.002                                      │
+│  • Severity: High                                               │
+│  • RE&CT-Phase: RA1xxx                                          │
+│  • Playbook-Link: [link to UC-001 playbook]                     │
+│  • SLA-Response: 15 min                                         │
+│  • SLA-Resolution: 8 hours                                      │
+│                                                                   │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                    ANALYST READS TICKET
+                    Opens: 12-Playbooks-UC-001.md
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              INVESTIGATION PHASE (Analyst + Runbook)             │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│ Analyst follows 12-Playbooks-UC-001.md steps:                   │
+│                                                                   │
+│ 1. TRIAGE PHASE (0-5 min)                                        │
+│    ├─ Validate alert data in Splunk                             │
+│    ├─ Check current group membership                            │
+│    └─ Quick legitimacy assessment                              │
+│                                                                   │
+│ 2. INVESTIGATION PHASE (5-15 min)                               │
+│    ├─ Gather evidence per RA1001                               │
+│    │  (See 03-REACT-Framework.md)                              │
+│    ├─ Interview actor and manager                              │
+│    ├─ Check change management system                           │
+│    └─ Set verdict: True Positive vs False Positive             │
+│                                                                   │
+│ Investigation updates JIRA:                                      │
+│  • Evidence uploaded to sub-tasks                               │
+│  • Interview notes added as comments                            │
+│  • Verdict set: TRUE POSITIVE                                  │
+│  • Move ticket to next status                                   │
+│                                                                   │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                    VERDICT DETERMINED
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+         ▼               ▼               ▼
+   FALSE POSITIVE   UNDETERMINED   TRUE POSITIVE
+         │               │               │
+         └──────────┬────┴───────────┬───┘
+                    │               │
+                    │               ▼
+                    │      AUTOMATION RULE 4:
+                    │      RE&CT Phase Progression
+                    │      Move to "Containment"
+                    │      
+                    │      Generate RA3xxx Checklist:
+                    │      □ RA3101 - Reset credentials
+                    │      □ RA3201 - Terminate process
+                    │      □ RA3301 - Block IP
+                    │      
+                    │      Link to:
+                    │      03-REACT-Framework.md
+                    │      (Containment procedures)
+                    │
+                    └──────────────────────────────┐
+                                                   │
+                    CLOSE TICKET                   ▼
+                    └──────────────────────────────────────┐
+                                                           │
+                                               CONTAINMENT PHASE
+                                               (See 03-REACT-Framework.md
+                                                RA3101-RA3301)
+                                                           │
+                                                           ▼
+                                               Move to Eradication
+                                               Execute RA4xxx actions
+                                                           │
+                                                           ▼
+                                               Move to Recovery
+                                               Execute RA5xxx actions
+                                                           │
+                                                           ▼
+                                               Move to Closed
+                                               Generate RA6xxx actions
+                                               (Lessons Learned)
+
+```
+
+---
+
+## Component Relationships
+
+### How MITRE ATT&CK Connects to Everything
+
+```
+ANALYTIC-001 (Detection)
+  ↓
+Detects: User added to admin group
+  ↓
+Maps to ATT&CK: T1098.002 (Account Manipulation)
+               T1136.001 (Create Account - Local Account)
+  ↓
+Used in: UC-001 (Use Case)
+  ↓
+Triggers: RE&CT Response
+  • RA1001 (Collect evidence of account creation)
+  • RA1002 (Identify if privileged account created)
+  • RA1003 (Determine if intentional vs. attack)
+  • RA3101 (Revoke admin if unauthorized)
+  ↓
+Response Documented in: 12-Playbooks-UC-001.md
+  • Step-by-step playbook
+  • Commands to execute
+  • Decision trees
+  • Success criteria
+
+FINAL JIRA TICKET:
+  • MITRE-ATT&CK: T1098.002
+  • Use-Case: UC-001
+  • RE&CT-Phase: RA1xxx → RA3xxx → RA4xxx → RA5xxx → RA6xxx
+  • Playbook-Link: UC-001 playbook
+  • Status transitions through JIRA workflow
+```
+
+### Relationship Matrix
+
+| Component | Purpose | Location | Integration |
+|-----------|---------|----------|-------------|
+| **Analytics** | Detect threats | Splunk | Fire webhook to JIRA |
+| **Use Cases** | Classify threats | 02-Use-Cases-Repository.md | Link to JIRA via custom field |
+| **MITRE ATT&CK** | Threat framework | Custom field in JIRA | Auto-populated from use case |
+| **RE&CT** | Response procedures | 03-REACT-Framework.md | Linked as JIRA checklist |
+| **Playbooks** | Incident guides | 12-Playbooks-*.md | Linked in JIRA ticket description |
+| **Runbooks** | Detailed procedures | Within playbooks | Step-by-step commands |
+| **JIRA** | Orchestration | SOC-OPS project | Central system of record |
+
+---
+
+## Example: Complete UC-001 Incident Flow
+
+### Starting Point: Raw Event Data
+
+```
+Windows Security Log 4728 Event:
+  Computer: SERVER-001
+  EventTime: 2025-01-15 14:32:00
+  SubjectUserName: DOMAIN\admin-user
+  TargetUserName: DOMAIN\new-user
+  TargetGroupName: Domain Admins
+  EventID: 4728
+```
+
+### Step 1: Detection (Analytics Layer)
+
+**ANALYTIC-001 Query in Splunk:**
+```spl
+index=windows EventCode=4728 
+| stats count by SubjectUserName, TargetUserName, Computer
+| where count >= 1
+```
+
+**Alert Fires:**
+- Alert name: "UC-001-AdminGroupAdd"
+- Severity: "High"
+- Host: "SERVER-001"
+- User: "DOMAIN\new-user"
+- Actor: "DOMAIN\admin-user"
+
+### Step 2: Orchestration (JIRA Creation)
+
+**Webhook Sent to JIRA:**
+```json
+{
+  "alert_name": "UC-001-AdminGroupAdd",
+  "severity": "High",
+  "analytic_id": "ANALYTIC-001",
+  "host": "SERVER-001",
+  "user": "DOMAIN\\new-user",
+  "actor": "DOMAIN\\admin-user",
+  "timestamp": "2025-01-15T14:32:00Z"
+}
+```
+
+**JIRA Automation Rules Execute:**
+
+1. **Rule 1:** Create ticket
+   ```
+   Title: "[High] UC-001 - Admin Added to Group - SERVER-001"
+   Description: (Auto-populated with alert details)
+   Status: Triage
+   ```
+
+2. **Rule 2:** Enrich with use case
+   ```
+   Custom Fields Set:
+   • Use-Case: UC-001
+   • MITRE-ATT&CK: T1098.002
+   • RE&CT-Phase: RA1xxx
+   • Playbook-Link: 12-Playbooks-UC-001.md
+   
+   Comment Added:
+   "Investigation runbook: UC-001 - Local Administrator Group Modification
+    Contact actor and manager to verify legitimacy.
+    See playbook for full procedure."
+   ```
+
+3. **Rule 3:** Set SLA and assign
+   ```
+   Custom Fields:
+   • SLA-Response: 15 minutes
+   • SLA-Resolution: 8 hours
+   • Assigned-To: On-call-analyst-john
+   
+   Slack Notification:
+   "🚨 [HIGH] Investigation assigned to @john
+    UC-001: Admin Group Addition on SERVER-001
+    Runbook: [link]"
+   ```
+
+### Step 3: Investigation (Analyst Uses Playbook)
+
+**Analyst opens: 12-Playbooks-UC-001.md**
+
+**Triage Phase (5 min):**
+```
+1. Validate alert in Splunk ✓
+2. Check current group membership:
+   > Get-ADGroupMember "Domain Admins"
+   Result: new-user IS still in group
+3. Quick assessment: Actor is known IT admin, timing is business hours
+   Conclusion: Possible legitimate, needs investigation
+```
+
+**Investigation Phase (10 min):**
+```
+1. Contact actor (admin-user):
+   "I need to verify a permission change at 14:32 today.
+    You added new-user to Domain Admins.
+    Can you explain the business reason?"
+   
+   Response: "Yes, we provisioned new-user as system admin
+              per change request CH-12345. Manager approved."
+
+2. Verify change ticket:
+   Query system: CH-12345
+   Status: APPROVED by Department Manager
+   Approval date: 2025-01-14
+   Implementation date: 2025-01-15 (today)
+   Matches action ✓
+
+3. Verdict: TRUE POSITIVE (but legitimate)
+   Conclusion: This was authorized privilege change
+```
+
+**Update JIRA:**
+```
+Status: Investigation → Closed
+Verdict: TRUE POSITIVE (Authorized)
+Comment: "Verified with actor and change control.
+          CH-12345 approved by manager.
+          Action is legitimate."
+```
+
+### Step 4: Closure and Metrics
+
+**JIRA Auto-Calculation:**
+```
+Metrics:
+• MTTT (Mean Time to Triage): 3 minutes
+• MTTD (Mean Time to Detect): 2 minutes (Splunk to alert)
+• MTTC (Mean Time to Contain): N/A (no containment needed)
+• MTTR (Mean Time to Resolve): 13 minutes
+• SLA Response: 15 min target, 3 min actual ✓
+• SLA Resolution: 8 hour target, 13 min actual ✓
+```
+
+**Lessons Learned (RA6xxx):**
+```
+Detection Effectiveness: ✓
+  • Detection fired quickly
+  • Playbook guided investigation
+  • Clear decision made rapidly
+
+Improvement Opportunity:
+  • Could pre-check change tickets to reduce false positives
+  • Filter: Alert + valid change ticket = auto-close in future
+
+Implementation:
+  • Update ANALYTIC-001 tuning
+  • Add pre-check for change tickets in JIRA automation
+```
+
+---
+
+## True Positive vs False Positive Example
+
+### Scenario A: Same Alert, Different Context (FALSE POSITIVE)
+
+```
+SAME ALERT FIRES:
+Event: new-user2 added to Domain Admins
+Time: 2025-01-15 22:45:00 (off-hours)
+
+TRIAGE:
+• Off-hours suspicious ⚠
+• Different admin actor ⚠
+• No change ticket found ⚠
+
+INVESTIGATION:
+1. Contact admin-user2:
+   "I need to verify a permission change at 22:45 today."
+   Response: "I didn't do anything like that. I was home."
+   
+2. Check for compromised admin account:
+   Look for other suspicious activity:
+   • Multiple other groups modified?
+   • Unusual logons?
+   • Lateral movement?
+   
+3. Verification shows: admin-user2 account likely compromised
+
+VERDICT: TRUE POSITIVE (Attack)
+
+RE&CT EXECUTION:
+→ Move to Containment (RA3xxx)
+  • Reset admin-user2 password
+  • Revoke new-user2 from admin group
+  • Scan for lateral movement
+  • Reset all admin passwords
+```
+
+### Scenario B: Same Alert, Different Context (TRUE POSITIVE)
+
+```
+SAME ALERT FIRES:
+Event: new-user3 added to Domain Admins
+Time: 2025-01-15 09:00:00 (business hours)
+
+TRIAGE:
+• Business hours ✓
+• Known IT admin actor ✓
+• Manager is known to request provisioning ✓
+
+INVESTIGATION:
+1. Contact admin-user:
+   "I provisioned new-user3 today as per CH-12346.
+    They're our new infrastructure engineer."
+   
+2. Verify CH-12346:
+   Pre-approved admin onboarding request
+   Approval: Director of Infrastructure
+   Implementation: Same day as alert
+
+VERDICT: FALSE POSITIVE (Legitimate)
+
+JIRA CLOSURE:
+→ Move to Closed
+→ Document as authorized change
+→ Update whitelist for future reference
+```
+
+---
+
+## JIRA Board States and Transitions
+
+```
+TRIAGE
+├─ Alert validated
+├─ Use case identified
+├─ SLA set
+└─ Awaiting investigation
+
+    ↓ (Analyst moves ticket)
+    
+INVESTIGATION
+├─ Running playbook steps
+├─ Gathering evidence (RA1001)
+├─ Identifying assets (RA1002)
+├─ Determining incident type (RA1003)
+└─ Setting verdict
+
+    ├─ (TRUE POSITIVE)
+    │
+    ▼
+    
+CONTAINMENT
+├─ Executing RA3xxx actions
+├─ RA3101 - Disable/reset credentials
+├─ RA3201 - Terminate processes
+├─ RA3301 - Block IPs/domains
+└─ Escalation if needed
+
+    ├─ (No further action needed)
+    │
+    ▼
+    
+ERADICATION
+├─ Executing RA4xxx actions
+├─ RA4101 - Full credential reset
+├─ RA4201 - Remove malware/persistence
+├─ RA4401 - Patch/fix vectors
+└─ Evidence collection (sub-task)
+
+    │
+    ▼
+    
+RECOVERY
+├─ Executing RA5xxx actions
+├─ RA5001 - Restore from backup
+├─ RA5101 - Restore user access
+└─ Baseline verification
+
+    │
+    ▼
+    
+CLOSED - True Positive
+├─ Executing RA6xxx actions
+├─ RA6001 - Document incident
+├─ RA6002 - Detection improvement
+├─ RA6003 - Control improvement
+└─ Metrics calculated
+
+    ├─ (FALSE POSITIVE)
+    │
+    └──→ CLOSED - False Positive
+         ├─ Document false positive reason
+         ├─ Tune detection
+         ├─ Update whitelist
+         └─ Metrics logged
+```
+
+---
+
+## Quick Start Integration
+
+### Day 1: Deploy Core Framework
+1. Import custom fields to JIRA SOC-OPS project
+2. Deploy JIRA automation rules (8 rules)
+3. Configure webhook from Splunk to JIRA
+4. Train team on basic workflow
+
+### Week 1: Deploy First Analytics
+1. Deploy ANALYTIC-001 to Splunk
+2. Create test alert to validate workflow
+3. Team walks through UC-001 playbook
+4. Refine automation rules based on test
+
+### Week 2-4: Expand Detection
+1. Deploy ANALYTIC-002 through ANALYTIC-007
+2. Establish false positive baselines
+3. Refine SLA settings
+4. Team practices additional use cases
+
+### Month 2+: Optimization
+1. Monitor metrics (MTTT, MTTC, MTTR)
+2. Improve automation coverage
+3. Expand to new use cases
+4. Implement detection improvements from lessons learned
+
+---
+
+## Troubleshooting & Support
+
+### Webhook Not Firing
+```
+Check:
+1. Splunk alert action configured
+2. Webhook URL is correct
+3. JIRA authentication token valid
+4. Network connectivity to JIRA
+5. Alert conditions actually met in data
+
+Debug:
+- Check Splunk alert execution log
+- Test webhook manually with curl
+- Verify JIRA accepts incoming webhooks
+```
+
+### JIRA Automation Not Executing
+```
+Check:
+1. Rules are enabled in JIRA
+2. JQL filter matches issue
+3. Actions are syntactically correct
+4. API permissions granted
+5. No conflicting rules
+
+Debug:
+- Review automation execution logs
+- Test rule condition separately
+- Check JIRA audit log for failures
+```
+
+### SLA Not Calculating
+```
+Check:
+1. SLA time tracking enabled in project
+2. Business hours configured
+3. Custom field values populated
+4. Issue in correct status
+5. No SLA exemption applied
+
+Debug:
+- Verify SLA rules in project settings
+- Check if issue is in SLA-tracked statuses
+- Confirm business hours match environment
+```
+
+---
+
+## Reference Quick Links
+
+| Component | Document | Purpose |
+|-----------|----------|---------|
+| Detections | 01-Analytics-Repository.md | 7 core detection queries |
+| Use Cases | 02-Use-Cases-Repository.md | 10 incident classifications |
+| Response | 03-REACT-Framework.md | RE&CT procedures RA1-RA6 |
+| Automation | 06-JIRA-Automation.md | JIRA workflow & rules |
+| Playbooks | 12-Playbooks-UC-001.md | UC-001 full walkthrough |
+| This Guide | This Document | Integration reference |
+
+---
+
+## Success Criteria
+
+Your framework is working when:
+
+```
+✓ Alert fires in Splunk
+✓ JIRA ticket auto-creates within 1 minute
+✓ Custom fields auto-populate
+✓ SLA timer starts
+✓ Analyst receives Slack notification
+✓ Analyst opens playbook in JIRA
+✓ Analyst follows playbook steps
+✓ Evidence collected in sub-tasks
+✓ Verdict set in custom field
+✓ RE&CT phase transitions trigger automation
+✓ Incident resolved per playbook
+✓ Metrics automatically calculated
+✓ Lessons learned sub-task created
+✓ Team reviews findings
+✓ Detection/control improvements implemented
+```
+
+When all above are true, your SOC framework is operational and driving continuous improvement.
