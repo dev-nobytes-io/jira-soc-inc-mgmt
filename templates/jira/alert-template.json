@@ -1,0 +1,116 @@
+{
+  "name": "SOC Alert Template",
+  "description": "Template for creating SOC security alerts",
+  "issueType": "Alert",
+  "fields": {
+    "summary": {
+      "type": "string",
+      "required": true,
+      "example": "[UC-001] Unauthorized Admin Group Addition - john.doe added to Administrators",
+      "pattern": "[UC-XXX] [Brief Description] - [Key Details]"
+    },
+    "description": {
+      "type": "text",
+      "required": true,
+      "template": "h2. Alert Summary\n\n*Detection Source:* {{detection_source}}\n*Detection Analytics:* {{analytic_id}}\n*Use Case:* {{use_case}}\n*Severity:* {{severity}}\n*Detected At:* {{timestamp}}\n\nh2. Event Details\n\n*Affected Assets:*\n* Host: {{computer}}\n* User: {{target_user}}\n* Actor: {{subject_user}}\n\n*Key Indicators:*\n* {{indicator_1}}\n* {{indicator_2}}\n\nh2. MITRE ATT&CK\n\n*Tactics:* {{tactics}}\n*Techniques:* {{techniques}}\n\nh2. Initial Context\n\n{{alert_description}}\n\nh2. Investigation Steps\n\nSee playbook: {{playbook_link}}\n\n1. Verify legitimacy\n2. Check for change ticket\n3. Review context\n4. Escalate if unauthorized\n\nh2. Evidence\n\n*Raw Event Data:*\n{code}\n{{raw_event_json}}\n{code}\n\n*SIEM Query:*\n{code}\n{{siem_query}}\n{code}"
+    },
+    "priority": {
+      "type": "select",
+      "required": true,
+      "options": ["Critical", "High", "Medium", "Low"],
+      "default": "Medium",
+      "mapping": {
+        "Critical": "P1",
+        "High": "P2",
+        "Medium": "P3",
+        "Low": "P4"
+      }
+    },
+    "customFields": {
+      "detectionSource": {
+        "fieldId": "customfield_10100",
+        "type": "select",
+        "required": true,
+        "options": ["SIEM Alert", "EDR/XDR", "Email Security Gateway", "Firewall/IDS/IPS", "User Report", "Threat Intelligence"]
+      },
+      "detectionAnalytics": {
+        "fieldId": "customfield_10101",
+        "type": "labels",
+        "required": false,
+        "example": ["ANALYTIC-001"]
+      },
+      "useCase": {
+        "fieldId": "customfield_10102",
+        "type": "select",
+        "required": false,
+        "example": "UC-001"
+      },
+      "mitreAttackTactics": {
+        "fieldId": "customfield_10103",
+        "type": "multiselect",
+        "required": false,
+        "options": ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"]
+      },
+      "mitreAttackTechniques": {
+        "fieldId": "customfield_10104",
+        "type": "labels",
+        "required": false,
+        "example": ["T1098.002", "T1136.001"]
+      },
+      "affectedAssets": {
+        "fieldId": "customfield_10105",
+        "type": "textarea",
+        "required": false,
+        "example": "Hostname: DC01\nIP: 10.0.1.5\nUser: john.doe\nDomain: CORP"
+      },
+      "picer lPhase": {
+        "fieldId": "customfield_10106",
+        "type": "select",
+        "required": false,
+        "default": "Identification",
+        "options": ["Preparation", "Identification", "Containment", "Eradication", "Recovery", "Lessons Learned"]
+      },
+      "primaryPlaybook": {
+        "fieldId": "customfield_10107",
+        "type": "select",
+        "required": false,
+        "example": "KB-0001"
+      },
+      "knowledgeBaseReferences": {
+        "fieldId": "customfield_10108",
+        "type": "textarea",
+        "required": false,
+        "example": "KB-0001: Admin Group Modification Response\nKB-1001: Alert Investigation Workflow"
+      }
+    }
+  },
+  "webhookPayload": {
+    "example": {
+      "fields": {
+        "project": {
+          "key": "SOC"
+        },
+        "issuetype": {
+          "name": "Alert"
+        },
+        "summary": "[UC-001] Unauthorized Admin Group Addition - john.doe added to Administrators",
+        "description": "Alert detected at 2025-12-14 10:45:23",
+        "priority": {
+          "name": "High"
+        },
+        "customfield_10100": {"value": "SIEM Alert"},
+        "customfield_10101": ["ANALYTIC-001"],
+        "customfield_10102": {"value": "UC-001"},
+        "customfield_10103": [{"value": "Persistence"}, {"value": "Privilege Escalation"}],
+        "customfield_10104": ["T1098.002", "T1136.001"],
+        "customfield_10106": {"value": "Identification"}
+      }
+    }
+  },
+  "automationTriggers": [
+    "AUTO-001: Alert Ingestion and Initial Enrichment",
+    "AUTO-002: Auto-Assign by Use Case and Severity",
+    "AUTO-003: SLA Configuration by Severity",
+    "AUTO-008: Auto-Link Related KB Articles"
+  ]
+}

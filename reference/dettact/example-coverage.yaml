@@ -1,0 +1,216 @@
+version: 1.0
+name: "SOC Detection Coverage Assessment - Q4 2025"
+domain: "enterprise-attack"
+platform: "Windows"
+author: "SOC Detection Engineering Team"
+date_created: "2025-12-14"
+date_modified: "2025-12-14"
+
+techniques:
+  - technique_id: "T1003.001"
+    technique_name: "LSASS Memory"
+    tactic: ["credential-access"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-004: Sysmon Event 10 monitoring for LSASS process access"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 4
+            comment: "Advanced detection with low FP rate, validated against real attacks"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 3
+          comment: "Good visibility via Sysmon deployment on all endpoints"
+          auto_generated: false
+
+  - technique_id: "T1098.002"
+    technique_name: "Account Manipulation: Domain Account"
+    tactic: ["persistence", "privilege-escalation"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-001: Windows Event 4728 monitoring"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 3
+            comment: "Moderate detection, some false positives from legitimate admin activity"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 3
+          comment: "Good visibility via Windows Security logs"
+          auto_generated: false
+
+  - technique_id: "T1110.003"
+    technique_name: "Brute Force: Password Spraying"
+    tactic: ["credential-access"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-003: Windows Event 4625 monitoring with threshold"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 2
+            comment: "Basic detection, needs tuning for threshold optimization"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 2
+          comment: "Partial visibility, some failed logons not captured"
+          auto_generated: false
+
+  - technique_id: "T1059.001"
+    technique_name: "Command and Scripting Interpreter: PowerShell"
+    tactic: ["execution"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-002: Sysmon Event 1 with suspicious PowerShell patterns"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 3
+            comment: "Moderate detection, catches obfuscated commands"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 3
+          comment: "Good visibility with PowerShell logging enabled"
+          auto_generated: false
+
+  - technique_id: "T1021.002"
+    technique_name: "Remote Services: SMB/Windows Admin Shares"
+    tactic: ["lateral-movement"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-005: Sysmon Event 3 network connections to ports 135, 445"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 3
+            comment: "Detects lateral movement, some false positives from legit admin"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 3
+          comment: "Good network visibility"
+          auto_generated: false
+
+  - technique_id: "T1041"
+    technique_name: "Exfiltration Over C2 Channel"
+    tactic: ["exfiltration"]
+    detection:
+      - applicable_to: ["all"]
+        location: "Network"
+        comment: "ANALYTIC-006: Network flow monitoring for large outbound transfers"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 2
+            comment: "Basic threshold-based detection"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 2
+          comment: "Partial network visibility, encrypted traffic not inspected"
+          auto_generated: false
+
+  - technique_id: "T1134"
+    technique_name: "Access Token Manipulation"
+    tactic: ["privilege-escalation", "defense-evasion"]
+    detection:
+      - applicable_to: ["all"]
+        location: "SIEM"
+        comment: "ANALYTIC-007: Sysmon Event 8 (CreateRemoteThread) monitoring"
+        score_logbook:
+          - date: "2025-12-14"
+            score: 3
+            comment: "Detects token manipulation attempts"
+            auto_generated: false
+    visibility:
+      score_logbook:
+        - date: "2025-12-14"
+          score: 3
+          comment: "Good visibility with Sysmon Event 8"
+          auto_generated: false
+
+# Gap Analysis - Techniques without detection
+gaps:
+  - technique_id: "T1136.001"
+    technique_name: "Create Account: Local Account"
+    tactic: ["persistence"]
+    reason: "No detection rule currently deployed"
+    priority: "High"
+    action_plan: "Develop ANALYTIC-011 for Event 4720 monitoring"
+    target_date: "2026-01-15"
+
+  - technique_id: "T1078.004"
+    technique_name: "Valid Accounts: Cloud Accounts"
+    tactic: ["defense-evasion", "persistence", "privilege-escalation", "initial-access"]
+    reason: "Limited cloud logging integration"
+    priority: "Critical"
+    action_plan: "Integrate Office 365 / Azure AD logs"
+    target_date: "2026-02-01"
+
+  - technique_id: "T1505.003"
+    technique_name: "Server Software Component: Web Shell"
+    tactic: ["persistence"]
+    reason: "Web server logs not centralized"
+    priority: "Medium"
+    action_plan: "Centralize IIS/Apache logs, develop detection"
+    target_date: "2026-03-01"
+
+# Data Source Assessment
+data_sources:
+  - name: "Windows Security Event Logs"
+    platforms: ["Windows"]
+    collection_coverage: 100
+    quality: "High"
+    score: 3
+    comment: "Full collection from all Windows systems via WEF"
+
+  - name: "Sysmon"
+    platforms: ["Windows"]
+    collection_coverage: 100
+    quality: "High"
+    score: 3
+    comment: "Deployed on all endpoints with standard config"
+
+  - name: "PowerShell Logs"
+    platforms: ["Windows"]
+    collection_coverage: 85
+    quality: "Medium"
+    score: 2
+    comment: "Not enabled on all workstations, deployment in progress"
+
+  - name: "Network Flow Data"
+    platforms: ["Network"]
+    collection_coverage: 90
+    quality: "Medium"
+    score: 2
+    comment: "Core network covered, some remote sites have gaps"
+
+  - name: "Cloud Logs (O365/Azure)"
+    platforms: ["Cloud"]
+    collection_coverage: 30
+    quality: "Low"
+    score: 1
+    comment: "Limited integration, improvement planned Q1 2026"
+
+# Summary Statistics
+summary:
+  total_techniques_assessed: 10
+  techniques_with_detection: 7
+  techniques_without_detection: 3
+  coverage_percentage: 70
+  average_detection_score: 2.9
+  average_visibility_score: 2.7
+  critical_gaps: 1
+  high_priority_gaps: 1
+  medium_priority_gaps: 1
