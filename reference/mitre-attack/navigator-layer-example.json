@@ -1,0 +1,317 @@
+{
+  "name": "SOC Incident Coverage - Q4 2025",
+  "versions": {
+    "navigator": "4.9.5",
+    "layer": "4.5",
+    "attack": "14"
+  },
+  "domain": "enterprise-attack",
+  "description": "MITRE ATT&CK techniques observed in SOC incidents during Q4 2025. Color intensity indicates incident frequency. This layer visualizes actual threat activity detected by our SOC.",
+  "filters": {
+    "platforms": ["Windows", "Linux", "macOS", "Cloud"]
+  },
+  "sorting": 3,
+  "layout": {
+    "layout": "side",
+    "aggregateFunction": "average",
+    "showID": true,
+    "showName": true,
+    "showAggregateScores": false,
+    "countUnscored": false
+  },
+  "hideDisabled": false,
+  "techniques": [
+    {
+      "techniqueID": "T1003.001",
+      "tactic": "credential-access",
+      "score": 23,
+      "color": "#ff6666",
+      "comment": "23 incidents detected. ANALYTIC-004 deployed with 95% detection rate. High-confidence indicator.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-004"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0042"
+        },
+        {
+          "name": "MTTR",
+          "value": "2.3 hours"
+        }
+      ],
+      "links": [
+        {
+          "label": "Playbook",
+          "url": "https://confluence.company.com/KB-0042"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1566.001",
+      "tactic": "initial-access",
+      "score": 47,
+      "color": "#ff3333",
+      "comment": "47 phishing incidents. ANALYTIC-010 deployed. Most common initial access vector.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-010"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0011"
+        },
+        {
+          "name": "MTTR",
+          "value": "1.2 hours"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1098.002",
+      "tactic": "persistence",
+      "score": 12,
+      "color": "#ff9999",
+      "comment": "12 incidents of admin group modification. ANALYTIC-001 deployed.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-001"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0001"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1110.003",
+      "tactic": "credential-access",
+      "score": 15,
+      "color": "#ff8080",
+      "comment": "15 password spraying attacks detected. ANALYTIC-003 needs tuning.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-003"
+        },
+        {
+          "name": "Status",
+          "value": "Needs Tuning"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1059.001",
+      "tactic": "execution",
+      "score": 19,
+      "color": "#ff7070",
+      "comment": "19 PowerShell abuse incidents. ANALYTIC-002 effective.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-002"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0027"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1021.002",
+      "tactic": "lateral-movement",
+      "score": 8,
+      "color": "#ffb3b3",
+      "comment": "8 lateral movement incidents via SMB. ANALYTIC-005 deployed.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-005"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0045"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1047",
+      "tactic": "execution",
+      "score": 7,
+      "color": "#ffcccc",
+      "comment": "7 WMI execution incidents. Detected by ANALYTIC-005.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-005"
+        }
+      ],
+      "showSubtechniques": false
+    },
+    {
+      "techniqueID": "T1041",
+      "tactic": "exfiltration",
+      "score": 5,
+      "color": "#ffe6e6",
+      "comment": "5 data exfiltration attempts. ANALYTIC-006 needs improvement.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-006"
+        },
+        {
+          "name": "Playbook",
+          "value": "KB-0051"
+        },
+        {
+          "name": "Status",
+          "value": "Improvement Needed"
+        }
+      ],
+      "showSubtechniques": false
+    },
+    {
+      "techniqueID": "T1134",
+      "tactic": "privilege-escalation",
+      "score": 3,
+      "color": "#fff2f2",
+      "comment": "3 token manipulation attempts. ANALYTIC-007 deployed.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Detection",
+          "value": "ANALYTIC-007"
+        }
+      ],
+      "showSubtechniques": false
+    },
+    {
+      "techniqueID": "T1136.001",
+      "tactic": "persistence",
+      "score": 0,
+      "color": "#ff0000",
+      "comment": "DETECTION GAP: No coverage for local account creation. Priority: High.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Status",
+          "value": "GAP - No Detection"
+        },
+        {
+          "name": "Priority",
+          "value": "High"
+        },
+        {
+          "name": "Action",
+          "value": "Develop ANALYTIC-011"
+        }
+      ],
+      "showSubtechniques": true
+    },
+    {
+      "techniqueID": "T1078.004",
+      "tactic": "initial-access",
+      "score": 0,
+      "color": "#cc0000",
+      "comment": "DETECTION GAP: Cloud account abuse not detected. Priority: Critical.",
+      "enabled": true,
+      "metadata": [
+        {
+          "name": "Status",
+          "value": "GAP - No Detection"
+        },
+        {
+          "name": "Priority",
+          "value": "Critical"
+        },
+        {
+          "name": "Action",
+          "value": "Integrate cloud logs"
+        }
+      ],
+      "showSubtechniques": true
+    }
+  ],
+  "gradient": {
+    "colors": [
+      "#ffffff",
+      "#ffe6e6",
+      "#ffcccc",
+      "#ffb3b3",
+      "#ff9999",
+      "#ff8080",
+      "#ff6666",
+      "#ff4d4d",
+      "#ff3333",
+      "#ff1a1a",
+      "#ff0000"
+    ],
+    "minValue": 0,
+    "maxValue": 50
+  },
+  "legendItems": [
+    {
+      "label": "Detection Gap (Red)",
+      "color": "#ff0000"
+    },
+    {
+      "label": "Low Activity (1-5 incidents)",
+      "color": "#ffe6e6"
+    },
+    {
+      "label": "Medium Activity (6-15 incidents)",
+      "color": "#ff9999"
+    },
+    {
+      "label": "High Activity (16-30 incidents)",
+      "color": "#ff6666"
+    },
+    {
+      "label": "Very High Activity (31+ incidents)",
+      "color": "#ff3333"
+    }
+  ],
+  "metadata": [
+    {
+      "name": "Period",
+      "value": "Q4 2025 (Oct-Dec)"
+    },
+    {
+      "name": "Total Incidents",
+      "value": "139"
+    },
+    {
+      "name": "Techniques Observed",
+      "value": "9"
+    },
+    {
+      "name": "Detection Gaps",
+      "value": "2"
+    },
+    {
+      "name": "Coverage",
+      "value": "82%"
+    }
+  ],
+  "showTacticRowBackground": true,
+  "tacticRowBackground": "#dddddd",
+  "selectTechniquesAcrossTactics": true,
+  "selectSubtechniquesWithParent": false
+}
