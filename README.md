@@ -14,7 +14,8 @@ jira-soc-inc-mgmt/
 │   ├── jira/                       # JIRA-specific documentation
 │   ├── confluence/                 # Confluence-specific documentation
 │   ├── workflows/                  # Workflow diagrams and documentation
-│   └── processes/                  # Process documentation
+│   ├── processes/                  # Process documentation
+│   └── ANALYTICS-REPORTING.md      # Analytics and reporting guide
 │
 ├── templates/                      # Templates for tickets, pages, reports
 │   ├── jira/                       # JIRA issue templates
@@ -33,9 +34,31 @@ jira-soc-inc-mgmt/
 │   ├── jira-rules/                 # JIRA automation rules
 │   └── scripts/                    # Helper scripts
 │
-├── analytics/                      # Detection analytics (SIEM queries)
-├── integrations/                   # Integration guides
-└── reference/                      # Reference materials
+├── analytics/                      # Detection analytics and SIEM queries
+│   ├── detection-rules/            # Detection rule definitions
+│   ├── siem-queries/               # Platform-specific queries
+│   ├── use-cases/                  # Detection use case documentation
+│   └── README.md                   # Analytics catalog and guide
+│
+├── configuration-items/            # Configuration Items (CI) framework
+│   ├── detection-analytics/        # Detection analytics as CIs
+│   ├── knowledge-base/             # KB articles as CIs
+│   ├── mitre-mappings/             # ATT&CK technique mappings
+│   ├── frameworks/                 # Framework alignment data
+│   └── README.md                   # CI integration guide
+│
+├── reference/                      # Reference materials and frameworks
+│   ├── frameworks/                 # General framework documentation
+│   ├── mitre-attack/               # MITRE ATT&CK integration
+│   ├── react/                      # RE&CT response framework
+│   ├── dettact/                    # DeTT&CT detection coverage
+│   ├── nist-csf-2.0/               # NIST CSF 2.0 framework
+│   └── picerl/                     # PICERL incident management
+│
+└── integrations/                   # Integration guides
+    ├── siem/                       # SIEM platform integrations
+    ├── edr/                        # EDR/XDR integrations
+    └── README.md                   # Integration overview
 ```
 
 ## Quick Start
@@ -70,34 +93,95 @@ See [docs/jira/SETUP.md](docs/jira/SETUP.md) for detailed instructions.
 
 ## Key Features
 
+### Configuration Items (CI) Integration
+- **Detection Analytics as CIs**: Track detection rules like ANALYTIC-001 through incidents
+- **Knowledge Base as CIs**: Link playbooks (KB-XXXX) to incidents for analytics
+- **Framework Mappings**: MITRE ATT&CK, NIST CSF 2.0, PICERL, RE&CT, DeTT&CT
+- **Relationship Tracking**: Chain from detection → technique → response → playbook
+- **Analytics & Reporting**: Measure detection effectiveness, playbook usage, coverage gaps
+
+### Framework Integration
+
+#### MITRE ATT&CK
+- **Tactics & Techniques**: Map incidents to ATT&CK framework
+- **Coverage Tracking**: Visualize detection coverage per technique
+- **ATT&CK Navigator**: Export heatmaps of observed techniques
+- **Threat Intelligence**: Auto-enrich incidents with technique details
+
+#### NIST CSF 2.0
+- **Function Mapping**: Align incidents to Govern, Identify, Protect, Detect, Respond, Recover
+- **Category Tracking**: Map activities to specific CSF categories (e.g., DE.CM-7, RS.MI-01)
+- **Compliance Reporting**: Track CSF coverage and maturity
+- **Workflow Alignment**: Auto-populate CSF fields based on incident phase
+
+#### PICERL Framework
+- **Phase Management**: Preparation, Identification, Containment, Eradication, Recovery, Lessons Learned
+- **Phase Duration Tracking**: Measure time in each phase
+- **Maturity Metrics**: Track incident response capability improvement
+- **Automated Transitions**: Auto-set phase based on workflow state
+
+#### RE&CT Response Framework
+- **Response Actions**: RA-coded procedures (RA3101: Disable credentials, RA4201: Remove malware)
+- **Action Checklists**: Auto-create response task lists per phase
+- **Procedure Guidance**: Step-by-step response procedures
+- **Effectiveness Tracking**: Measure action completion and success rates
+
+#### DeTT&CT Detection Coverage
+- **Coverage Assessment**: Score detection capability per ATT&CK technique (0-5 scale)
+- **Gap Analysis**: Identify techniques without detection
+- **Maturity Tracking**: Measure overall detection program maturity
+- **Visualization**: Export coverage layers to ATT&CK Navigator
+
 ### JIRA Features
 - **Custom Issue Types**: Alert, Incident, Investigation, Policy Violation
-- **Automated Workflows**: Triage → Investigation → Containment → Resolution
+- **Automated Workflows**: Triage → Investigation → Containment → Eradication → Recovery
 - **Smart Enrichment**: Automatic data gathering from integrations
 - **SLA Tracking**: Configurable SLAs by severity and type
-- **Dashboards**: Real-time SOC metrics and KPIs
+- **Advanced Dashboards**: Detection coverage, framework compliance, CI analytics
 
 ### Confluence Features
-- **Knowledge Base**: Centralized security documentation
-- **Playbook Library**: Step-by-step response procedures
-- **Post-Incident Reviews**: Templates for lessons learned
-- **Threat Intelligence**: Tracking and sharing threat data
-- **Team Runbooks**: Operational procedures
+- **Knowledge Base**: Centralized security documentation (KB-XXXX format)
+- **Playbook Library**: Step-by-step response procedures with effectiveness ratings
+- **Post-Incident Reviews**: Lessons learned templates with improvement tracking
+- **Threat Intelligence**: ATT&CK mappings, threat actor profiles, campaign analysis
+- **Team Runbooks**: Operational procedures linked to incidents
+
+### Detection Analytics
+- **Analytics Catalog**: ANALYTIC-XXX numbered detection rules
+- **SIEM Queries**: Platform-specific implementation (Splunk, Sentinel, etc.)
+- **Coverage Mapping**: Link analytics to ATT&CK techniques
+- **Effectiveness Metrics**: True positive rate, MTTR, detection quality
+- **Use Case Tracking**: Document detection objectives and validation
 
 ### Automation
 - Auto-assignment based on incident type
 - Severity escalation rules
-- Notification triggers
-- Evidence collection automation
-- Status synchronization
+- Framework auto-population (ATT&CK, CSF, PICERL)
+- Detection analytics linking
+- Knowledge base article suggestions
+- RE&CT action checklist creation
+- Phase duration tracking
+- Playbook effectiveness prompts
 
 ## Documentation
 
 ### Core Documentation
 - [JIRA Setup Guide](docs/jira/SETUP.md)
+- [Configuration Items Setup](docs/jira/CONFIGURATION-ITEMS.md)
+- [Analytics & Reporting Guide](docs/ANALYTICS-REPORTING.md)
 - [Confluence Setup Guide](docs/confluence/SETUP.md)
 - [Workflow Overview](docs/workflows/OVERVIEW.md)
 - [Integration Guide](integrations/README.md)
+
+### Configuration Items & Frameworks
+- [Configuration Items Overview](configuration-items/README.md)
+- [Detection Analytics Catalog](analytics/README.md)
+- [Knowledge Base Integration](configuration-items/knowledge-base/README.md)
+- [MITRE ATT&CK Integration](reference/mitre-attack/README.md)
+- [NIST CSF 2.0 Framework](reference/nist-csf-2.0/README.md)
+- [PICERL Framework](reference/picerl/README.md)
+- [RE&CT Response Framework](reference/react/README.md)
+- [DeTT&CT Coverage Tracking](reference/dettact/README.md)
 
 ### JIRA Configuration
 - [Custom Fields](docs/jira/CUSTOM-FIELDS.md)
